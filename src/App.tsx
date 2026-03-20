@@ -24,6 +24,7 @@ import {
   ArrowDownLeft, 
   Settings, 
   Video, 
+  TrendingUp,
   Paperclip, 
   Send,
   ChevronLeft,
@@ -191,6 +192,7 @@ interface Lesson {
   type: 'Trial' | 'Single' | 'Package' | 'Monthly';
   countdown?: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  studentNote?: string;
 }
 
 interface Message {
@@ -264,6 +266,51 @@ const MOCK_STUDENTS: Student[] = [
       { id: 'm3', title: 'Basic Raags', status: 'upcoming' },
       { id: 'm4', title: 'Improvisation', status: 'upcoming' },
     ]
+  },
+  { 
+    id: 's4', 
+    name: 'Ahmad Fauzi', 
+    email: 'ahmad.f@example.com',
+    instrument: 'Gambus', 
+    stage: 'New Student', 
+    lessonsRemaining: 0, 
+    lastLesson: '-', 
+    package: 'Trial', 
+    photo: 'https://picsum.photos/seed/ahmad/200', 
+    progress: 0, 
+    totalLessons: 1,
+    aboutMe: "Interested in traditional Malay music.",
+    learningPath: []
+  },
+  { 
+    id: 's5', 
+    name: 'Mei Ling', 
+    email: 'mei.l@example.com',
+    instrument: 'Guzheng', 
+    stage: 'New Student', 
+    lessonsRemaining: 0, 
+    lastLesson: '-', 
+    package: 'Trial', 
+    photo: 'https://picsum.photos/seed/mei/200', 
+    progress: 0, 
+    totalLessons: 1,
+    aboutMe: "Love the sound of Guzheng.",
+    learningPath: []
+  },
+  { 
+    id: 's6', 
+    name: 'Karthik Raja', 
+    email: 'karthik.r@example.com',
+    instrument: 'Tabla', 
+    stage: 'New Student', 
+    lessonsRemaining: 0, 
+    lastLesson: '-', 
+    package: 'Trial', 
+    photo: 'https://picsum.photos/seed/karthik/200', 
+    progress: 0, 
+    totalLessons: 1,
+    aboutMe: "Fascinated by Indian rhythms.",
+    learningPath: []
   },
 ];
 
@@ -368,6 +415,36 @@ const MOCK_LESSONS: Lesson[] = [
   { id: 'l1', studentId: 's1', studentName: 'Sarah Jenkins', instrument: 'Gambus', time: '14:00', date: '2024-03-15', lessonNumber: 5, type: 'Package', status: 'confirmed' },
   { id: 'l2', studentId: 's2', studentName: 'Marcus Chen', instrument: 'Erhu', time: '16:30', date: '2024-03-15', lessonNumber: 2, type: 'Single', status: 'confirmed' },
   { id: 'l3', studentId: 's3', studentName: 'Elena Rodriguez', instrument: 'Sitar', time: '11:00', date: '2024-03-16', lessonNumber: 1, type: 'Monthly', status: 'confirmed' },
+  { id: 'l4', studentId: 's4', studentName: 'Ahmad Fauzi', instrument: 'Gambus', time: '10:00', date: '2024-03-22', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '2h 15m', studentNote: "Hi, I'm a complete beginner. Looking forward to learning the basics!" },
+  { id: 'l5', studentId: 's5', studentName: 'Mei Ling', instrument: 'Guzheng', time: '15:00', date: '2024-03-23', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '5h 40m', studentNote: "I've played a bit before, but want to focus on traditional techniques." },
+  { id: 'l6', studentId: 's6', studentName: 'Karthik Raja', instrument: 'Tabla', time: '18:30', date: '2024-03-24', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '12h 10m', studentNote: "Interested in the rhythmic patterns of the Tabla. Can we start with basic bols?" },
+];
+
+const MOCK_MESSAGES = [
+  {
+    id: 'ch1',
+    mentorId: 'm1',
+    studentId: 's1',
+    lastMessage: 'Looking forward to our next session!',
+    timestamp: '2h ago',
+    unreadCount: 0,
+    messages: [
+      { id: 'msg1', sender: 'mentor', text: 'Hi Sarah, how was your practice session today?', timestamp: '10:00 AM' },
+      { id: 'msg2', sender: 'student', text: 'It was great! I managed to master the basic Zapin rhythm.', timestamp: '10:15 AM' },
+      { id: 'msg3', sender: 'mentor', text: 'Excellent! Looking forward to our next session!', timestamp: '10:20 AM' }
+    ]
+  },
+  {
+    id: 'ch2',
+    mentorId: 'm2',
+    studentId: 's2',
+    lastMessage: 'Can we reschedule to 5 PM?',
+    timestamp: '1d ago',
+    unreadCount: 1,
+    messages: [
+      { id: 'msg4', sender: 'student', text: 'Hi Guru Rajesh, can we reschedule to 5 PM?', timestamp: 'Yesterday' }
+    ]
+  }
 ];
 
 const MOCK_INSTRUMENTS: Instrument[] = [
@@ -378,8 +455,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'ݢامبوس',
     type: 'Plucked',
     culture: 'Malay',
-    story: 'The soul of Zapin music. A short-necked lute that arrived via the spice trade, now a cornerstone of Malay folk music.',
-    mentorCount: 4,
+    story: 'A short-necked lute, the soul of Zapin music. It arrived via the spice trade and became a cornerstone of Malay folk music.',
+    mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -388,7 +465,7 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'بيولا ملايو',
     type: 'String',
     culture: 'Malay',
-    story: 'Adapted from Western influence into Asli music, the Biola Melayu carries the haunting melodies of traditional ghazals.',
+    story: 'Traditional violin adapted for Asli and Ghazal music, carrying haunting melodies through generations.',
     mentorCount: 3,
     photo: 'https://images.unsplash.com/photo-1612225330812-01a9c6b355ec?auto=format&fit=crop&q=80&w=400'
   },
@@ -398,7 +475,7 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'رباب',
     type: 'String',
     culture: 'Malay',
-    story: 'The lead instrument in Mak Yong performances. Its three strings produce a voice-like quality that leads the ensemble.',
+    story: 'A three-stringed bowed instrument used in Mak Yong. Its voice-like quality leads the traditional ensemble.',
     mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=400'
   },
@@ -409,8 +486,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'तबला',
     type: 'Percussion',
     culture: 'Indian',
-    story: 'The rhythmic heartbeat of Hindustani music. A pair of hand drums capable of incredibly complex and fast rhythms.',
-    mentorCount: 5,
+    story: 'A pair of hand drums for complex Hindustani rhythms. The rhythmic heartbeat of Indian classical music.',
+    mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1599932840003-882298642398?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -419,8 +496,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'सितार',
     type: 'Plucked',
     culture: 'Indian',
-    story: 'Known for its complex sympathetic strings and resonant sound. It defines the sound of North Indian classical music.',
-    mentorCount: 4,
+    story: 'A plucked string instrument with sympathetic strings. It defines the resonant sound of North Indian classical music.',
+    mentorCount: 3,
     photo: 'https://images.unsplash.com/photo-1615111784767-4d7c419f25d0?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -429,8 +506,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'बांसुरी',
     type: 'Wind',
     culture: 'Indian',
-    story: 'The voice of pastoral and divine melodies. A simple bamboo flute that requires immense breath control.',
-    mentorCount: 3,
+    story: 'A bamboo flute requiring immense breath control. It produces pastoral and divine melodies.',
+    mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1588449668365-d15e397f6787?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -439,8 +516,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'வயலின்',
     type: 'String',
     culture: 'Indian',
-    story: 'Played seated, held between the chest and the foot. It mimics the nuances of the human voice in South Indian music.',
-    mentorCount: 3,
+    story: 'Seated violin style mimicking the human voice. Held between the chest and foot in South Indian music.',
+    mentorCount: 1,
     photo: 'https://images.unsplash.com/photo-1460039230329-eb070fc6c77c?auto=format&fit=crop&q=80&w=400'
   },
   // Chinese
@@ -450,8 +527,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: '二胡',
     type: 'String',
     culture: 'Chinese',
-    story: 'Often called the "Chinese violin". Its two strings and python-skin resonator create a deeply expressive, soulful sound.',
-    mentorCount: 4,
+    story: 'The Chinese violin with a python-skin resonator. Its two strings create a deeply expressive, soulful sound.',
+    mentorCount: 3,
     photo: 'https://images.unsplash.com/photo-1605826832916-d00908649430?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -460,8 +537,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: '笛子',
     type: 'Wind',
     culture: 'Chinese',
-    story: 'Famous for its unique buzzing membrane (di-mo), giving it a bright, resonant timbre heard in folk and opera.',
-    mentorCount: 3,
+    story: 'A bamboo flute with a unique buzzing membrane. Famous for its bright, resonant timbre.',
+    mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1520193343412-d5983d2a74d0?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -470,7 +547,7 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: '琵琶',
     type: 'Plucked',
     culture: 'Chinese',
-    story: 'Shaped like a pear, known for its rapid-fire plucking techniques. It can depict both delicate scenes and fierce battles.',
+    story: 'A pear-shaped lute known for rapid plucking. It can depict both delicate scenes and fierce battles.',
     mentorCount: 3,
     photo: 'https://images.unsplash.com/photo-1550933280-67469b232c63?auto=format&fit=crop&q=80&w=400'
   },
@@ -480,8 +557,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: '古筝',
     type: 'Plucked',
     culture: 'Chinese',
-    story: 'An ancient zither with 21 strings. Its cascading notes evoke the sound of flowing water and mountain echoes.',
-    mentorCount: 5,
+    story: 'An ancient 21-string zither. Its cascading notes evoke flowing water and mountain echoes.',
+    mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1621274403997-37aae1848b40?auto=format&fit=crop&q=80&w=400'
   },
   // Borneo
@@ -491,8 +568,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'Sape',
     type: 'Plucked',
     culture: 'Borneo',
-    story: 'Boat-shaped lute from Sarawak. Traditionally used for healing rituals by the Orang Ulu, its sound is ethereal and calming.',
-    mentorCount: 6,
+    story: 'The famous boat-shaped lute from Sarawak. Traditionally used for healing rituals, its sound is ethereal.',
+    mentorCount: 3,
     photo: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&q=80&w=400'
   },
   {
@@ -501,7 +578,7 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'Tongkungon',
     type: 'Plucked',
     culture: 'Borneo',
-    story: 'A bamboo tube zither from Sabah. It mimics the sound of a full brass gong ensemble on a single piece of bamboo.',
+    story: 'A bamboo tube zither that mimics gong ensembles. A traditional instrument from the heart of Sabah.',
     mentorCount: 2,
     photo: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&q=80&w=400'
   },
@@ -511,8 +588,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     nativeName: 'Turali',
     type: 'Wind',
     culture: 'Borneo',
-    story: 'Bamboo nose flute from the Kadazan-Dusun. Used to express grief or mimic the sounds of nature in the deep rainforest.',
-    mentorCount: 2,
+    story: 'A bamboo nose flute used for expressive melodies. It mimics the sounds of nature in the deep rainforest.',
+    mentorCount: 1,
     photo: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&q=80&w=400'
   }
 ];
@@ -520,8 +597,8 @@ const MOCK_INSTRUMENTS: Instrument[] = [
 const MOCK_MENTORS: MentorDetail[] = [
   {
     id: 'm1',
-    name: 'Cikgu Aris',
-    tagline: 'Master of Traditional Malay Strings',
+    name: 'Cikgu Aris Ramli',
+    tagline: 'Preserving the Soul of Zapin',
     photo: 'https://picsum.photos/seed/aris/200',
     rating: 4.9,
     reviewCount: 128,
@@ -531,7 +608,7 @@ const MOCK_MENTORS: MentorDetail[] = [
     studentsCount: 45,
     experienceYears: 15,
     about: 'I have been playing and teaching Gambus and Rebab for over 15 years. My passion is to preserve the heritage of Malay music for the next generation.',
-    specialisation: ['Gambus', 'Rebab', 'Biola Melayu'],
+    specialisation: ['Gambus', 'Rebab'],
     teachingStyle: ['Traditional Oral Tradition', 'Modern Notation', 'Ensemble Focus'],
     languages: ['Bahasa Malaysia', 'English'],
     isVerified: true,
@@ -544,12 +621,15 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     reviews: [
       { id: 'r1', studentName: 'Sarah J.', lessonsTaken: 12, rating: 5, comment: 'Cikgu Aris is an amazing teacher! He is very patient and explains things clearly.', timeAgo: '2 days ago' },
-      { id: 'r2', studentName: 'Marcus C.', lessonsTaken: 5, rating: 4.8, comment: 'Really enjoyed the sessions. The traditional techniques are fascinating.', timeAgo: '1 week ago' }
+      { id: 'r2', studentName: 'Marcus C.', lessonsTaken: 5, rating: 4.8, comment: 'Really enjoyed the sessions. The traditional techniques are fascinating.', timeAgo: '1 week ago' },
+      { id: 'r1_2', studentName: 'Ahmad F.', lessonsTaken: 8, rating: 5, comment: 'The studio environment is very peaceful and conducive for learning traditional instruments.', timeAgo: '3 weeks ago' }
     ],
     credentials: ['Master of Arts (Music) - ASWARA', 'National Heritage Award 2022'],
     gallery: [
       'https://picsum.photos/seed/loc1/400/300',
-      'https://picsum.photos/seed/loc2/400/300'
+      'https://picsum.photos/seed/loc2/400/300',
+      'https://picsum.photos/seed/studio1/400/300',
+      'https://picsum.photos/seed/studio2/400/300'
     ]
   },
   {
@@ -577,12 +657,16 @@ const MOCK_MENTORS: MentorDetail[] = [
       { id: 'p4', name: 'Monthly', lessons: 4, price: 350, description: '4 lessons • auto renews' }
     ],
     reviews: [
-      { id: 'r3', studentName: 'Anjali D.', lessonsTaken: 20, rating: 5, comment: 'Guru Rajesh is a true master. His knowledge of rhythm is unparalleled.', timeAgo: '3 days ago' }
+      { id: 'r3', studentName: 'Anjali D.', lessonsTaken: 20, rating: 5, comment: 'Guru Rajesh is a true master. His knowledge of rhythm is unparalleled.', timeAgo: '3 days ago' },
+      { id: 'r3_2', studentName: 'Kevin L.', lessonsTaken: 10, rating: 5, comment: 'The Tabla sessions are intense but very rewarding. Highly recommend!', timeAgo: '2 weeks ago' },
+      { id: 'r3_3', studentName: 'Priya S.', lessonsTaken: 4, rating: 4.9, comment: 'Great atmosphere in the studio. Guru Rajesh makes complex rhythms easy to understand.', timeAgo: '1 month ago' }
     ],
     credentials: ['Sangeet Visharad', 'Performed at Petronas Philharmonic Hall'],
     gallery: [
       'https://picsum.photos/seed/raj1/400/300',
-      'https://picsum.photos/seed/raj2/400/300'
+      'https://picsum.photos/seed/raj2/400/300',
+      'https://picsum.photos/seed/rajstudio1/400/300',
+      'https://picsum.photos/seed/rajstudio2/400/300'
     ]
   },
   {
@@ -610,12 +694,16 @@ const MOCK_MENTORS: MentorDetail[] = [
       { id: 'p4', name: 'Monthly', lessons: 4, price: 420, description: '4 lessons • auto renews' }
     ],
     reviews: [
-      { id: 'r4', studentName: 'Wei Kiat', lessonsTaken: 15, rating: 5, comment: 'Master Wong is very strict but his results are incredible.', timeAgo: '5 days ago' }
+      { id: 'r4', studentName: 'Wei Kiat', lessonsTaken: 15, rating: 5, comment: 'Master Wong is very strict but his results are incredible.', timeAgo: '5 days ago' },
+      { id: 'r4_2', studentName: 'Mei Ling', lessonsTaken: 8, rating: 4.7, comment: 'The Erhu has such a beautiful, haunting sound. Master Wong teaches with great precision.', timeAgo: '2 weeks ago' },
+      { id: 'r4_3', studentName: 'David T.', lessonsTaken: 12, rating: 5, comment: 'Excellent studio setup. The acoustics are perfect for Guzheng practice.', timeAgo: '1 month ago' }
     ],
     credentials: ['Central Conservatory of Music Graduate', 'Penang Arts Excellence Award'],
     gallery: [
       'https://picsum.photos/seed/wong1/400/300',
-      'https://picsum.photos/seed/wong2/400/300'
+      'https://picsum.photos/seed/wong2/400/300',
+      'https://picsum.photos/seed/wongstudio1/400/300',
+      'https://picsum.photos/seed/wongstudio2/400/300'
     ]
   },
   {
@@ -643,12 +731,560 @@ const MOCK_MENTORS: MentorDetail[] = [
       { id: 'p4', name: 'Monthly', lessons: 4, price: 500, description: '4 lessons • auto renews' }
     ],
     reviews: [
-      { id: 'r5', studentName: 'Jasmine L.', lessonsTaken: 30, rating: 5, comment: 'Learning from a living legend is a dream come true.', timeAgo: '1 day ago' }
+      { id: 'r5', studentName: 'Jasmine L.', lessonsTaken: 30, rating: 5, comment: 'Learning from a living legend is a dream come true.', timeAgo: '1 day ago' },
+      { id: 'r5_2', studentName: 'Boon H.', lessonsTaken: 15, rating: 5, comment: 'The Sape music is so healing. Mathew is a wonderful storyteller and teacher.', timeAgo: '1 week ago' },
+      { id: 'r5_3', studentName: 'Elena R.', lessonsTaken: 6, rating: 4.8, comment: 'The studio is filled with beautiful handcrafted Sapes. A truly authentic experience.', timeAgo: '3 weeks ago' }
     ],
     credentials: ['National Living Heritage (Warisan Kebangsaan)', 'UNESCO Recognition'],
     gallery: [
       'https://picsum.photos/seed/mat1/400/300',
-      'https://picsum.photos/seed/mat2/400/300'
+      'https://picsum.photos/seed/mat2/400/300',
+      'https://picsum.photos/seed/matstudio1/400/300',
+      'https://picsum.photos/seed/matstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm5',
+    name: 'Cikgu Siti Aminah',
+    tagline: 'Melodies of the Biola Melayu',
+    photo: 'https://picsum.photos/seed/siti/200',
+    rating: 4.85,
+    reviewCount: 64,
+    location: 'Shah Alam, Selangor',
+    address: '22, Jalan Snuker 13/28, Seksyen 13, 40100 Shah Alam',
+    pricePerLesson: 75,
+    studentsCount: 28,
+    experienceYears: 12,
+    about: 'I specialize in the Biola Melayu, bringing the haunting melodies of Asli and Ghazal music to life.',
+    specialisation: ['Biola Melayu'],
+    teachingStyle: ['Melodic Focus', 'Historical Context', 'Technique Driven'],
+    languages: ['Bahasa Malaysia', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 75, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 540, validityMonths: 4 },
+      { id: 'p4', name: 'Monthly', lessons: 4, price: 280 }
+    ],
+    reviews: [
+      { id: 'r6', studentName: 'Nurul A.', lessonsTaken: 10, rating: 4.9, comment: 'Cikgu Siti is very detailed in her teaching. I love the Asli repertoire.', timeAgo: '4 days ago' },
+      { id: 'r6_2', studentName: 'Zul H.', lessonsTaken: 4, rating: 4.8, comment: 'The Biola Melayu has a unique charm. The studio is very welcoming.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['Diploma in Music - UiTM', 'Best Instrumental Performance (Ghazal Festival)'],
+    gallery: [
+      'https://picsum.photos/seed/siti1/400/300',
+      'https://picsum.photos/seed/siti2/400/300',
+      'https://picsum.photos/seed/sitistudio1/400/300',
+      'https://picsum.photos/seed/sitistudio2/400/300'
+    ]
+  },
+  {
+    id: 'm6',
+    name: 'Guru Meenakshi',
+    tagline: 'The Divine Voice of Carnatic Violin',
+    photo: 'https://picsum.photos/seed/meena/200',
+    rating: 4.92,
+    reviewCount: 75,
+    location: 'Petaling Jaya, Selangor',
+    address: '8, Jalan Templer, 46000 Petaling Jaya',
+    pricePerLesson: 110,
+    studentsCount: 25,
+    experienceYears: 18,
+    about: 'Trained in the Lalgudi style, I teach the seated Carnatic violin, focusing on mimicking the human voice.',
+    specialisation: ['Violin Carnatic'],
+    teachingStyle: ['Gayana Style', 'Raga Exploration', 'Spiritual Approach'],
+    languages: ['English', 'Tamil'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 110, description: '60 mins' },
+      { id: 'p2', name: '10 Lessons', lessons: 10, price: 990, validityMonths: 5 }
+    ],
+    reviews: [
+      { id: 'r7', studentName: 'Suresh K.', lessonsTaken: 15, rating: 5, comment: 'Guru Meenakshi is a treasure. Her teaching is deeply spiritual.', timeAgo: '1 week ago' },
+      { id: 'r7_2', studentName: 'Lakshmi V.', lessonsTaken: 8, rating: 4.9, comment: 'The Lalgudi style is so expressive. The studio has a very positive vibe.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['B.A. Music (Violin) - Madras University', 'A-Grade Artist (All India Radio)'],
+    gallery: [
+      'https://picsum.photos/seed/meena1/400/300',
+      'https://picsum.photos/seed/meena2/400/300',
+      'https://picsum.photos/seed/meenastudio1/400/300',
+      'https://picsum.photos/seed/meenastudio2/400/300'
+    ]
+  },
+  {
+    id: 'm7',
+    name: 'Pandit Ravi',
+    tagline: 'Breath of the Bansuri',
+    photo: 'https://picsum.photos/seed/ravi/200',
+    rating: 4.98,
+    reviewCount: 112,
+    location: 'Kajang, Selangor',
+    address: 'Jalan Bukit, 43000 Kajang',
+    pricePerLesson: 95,
+    studentsCount: 40,
+    experienceYears: 22,
+    about: 'The Bansuri is more than an instrument; it is a meditation. I teach breath control and the nuances of Hindustani ragas.',
+    specialisation: ['Bansuri Flute', 'Sitar'],
+    teachingStyle: ['Meditative Practice', 'Breath Mastery', 'Raga Theory'],
+    languages: ['English', 'Hindi', 'Malayalam'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 95, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 684, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r8', studentName: 'Rohan M.', lessonsTaken: 12, rating: 5, comment: 'Pandit Ravi is a master of the Bansuri. His breath control exercises are life-changing.', timeAgo: '2 days ago' },
+      { id: 'r8_2', studentName: 'Sita R.', lessonsTaken: 6, rating: 5, comment: 'The studio is a peaceful sanctuary. Learning Sitar here is a wonderful experience.', timeAgo: '1 week ago' }
+    ],
+    credentials: ['Disciple of Hariprasad Chaurasia', 'International Flute Festival Performer'],
+    gallery: [
+      'https://picsum.photos/seed/ravi1/400/300',
+      'https://picsum.photos/seed/ravi2/400/300',
+      'https://picsum.photos/seed/ravistudio1/400/300',
+      'https://picsum.photos/seed/ravistudio2/400/300'
+    ]
+  },
+  {
+    id: 'm8',
+    name: 'Master Chen',
+    tagline: 'Bright Echoes of the Dizi',
+    photo: 'https://picsum.photos/seed/chen/200',
+    rating: 4.87,
+    reviewCount: 94,
+    location: 'Cheras, Kuala Lumpur',
+    address: 'Jalan Cheras, 56100 Kuala Lumpur',
+    pricePerLesson: 80,
+    studentsCount: 35,
+    experienceYears: 15,
+    about: 'Specializing in the Dizi and its unique buzzing membrane. I teach both folk and operatic styles.',
+    specialisation: ['Dizi', 'Erhu'],
+    teachingStyle: ['Technical Precision', 'Folk Repertoire', 'Breath Control'],
+    languages: ['Mandarin', 'Cantonese', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 80, description: '60 mins' },
+      { id: 'p2', name: '12 Lessons', lessons: 12, price: 864, validityMonths: 6 }
+    ],
+    reviews: [
+      { id: 'r9', studentName: 'Li Wei', lessonsTaken: 10, rating: 5, comment: 'Master Chen is very patient. The Dizi sounds so bright and clear under his guidance.', timeAgo: '3 days ago' },
+      { id: 'r9_2', studentName: 'Siew M.', lessonsTaken: 5, rating: 4.8, comment: 'The studio is well-equipped. I love the traditional atmosphere.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['Shanghai Conservatory of Music', 'Gold Medalist - National Chinese Music Competition'],
+    gallery: [
+      'https://picsum.photos/seed/chen1/400/300',
+      'https://picsum.photos/seed/chen2/400/300',
+      'https://picsum.photos/seed/chenstudio1/400/300',
+      'https://picsum.photos/seed/chenstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm9',
+    name: 'Ms. Lin',
+    tagline: 'Cascading Notes of the Guzheng',
+    photo: 'https://picsum.photos/seed/lin/200',
+    rating: 4.94,
+    reviewCount: 142,
+    location: 'Puchong, Selangor',
+    address: 'Bandar Puteri, 47100 Puchong',
+    pricePerLesson: 110,
+    studentsCount: 50,
+    experienceYears: 14,
+    about: 'The Guzheng evokes the sound of flowing water. I help students master the 21 strings with grace and precision.',
+    specialisation: ['Guzheng', 'Pipa'],
+    teachingStyle: ['Graceful Technique', 'Repertoire Focused', 'Performance Prep'],
+    languages: ['Mandarin', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 110, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 792, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r10', studentName: 'Xiao Yan', lessonsTaken: 15, rating: 5, comment: 'Ms. Lin is a wonderful teacher. The Guzheng is such a beautiful instrument.', timeAgo: '1 week ago' },
+      { id: 'r10_2', studentName: 'Tan K.', lessonsTaken: 8, rating: 4.9, comment: 'The studio is very elegant. I enjoy every lesson here.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['Master of Music - Beijing Academy', 'Featured Soloist - Asian Cultural Festival'],
+    gallery: [
+      'https://picsum.photos/seed/lin1/400/300',
+      'https://picsum.photos/seed/lin2/400/300',
+      'https://picsum.photos/seed/linstudio1/400/300',
+      'https://picsum.photos/seed/linstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm10',
+    name: 'Uncle Jerry Kamit',
+    tagline: 'Sarawak Sape Virtuoso',
+    photo: 'https://picsum.photos/seed/jerry/200',
+    rating: 4.99,
+    reviewCount: 185,
+    location: 'Kuching, Sarawak',
+    address: 'Jalan Satok, 93400 Kuching',
+    pricePerLesson: 130,
+    studentsCount: 65,
+    experienceYears: 35,
+    about: 'A master of the contemporary Sape style. I blend traditional Orang Ulu melodies with modern sensibilities.',
+    specialisation: ['Sape'],
+    teachingStyle: ['Modern Fusion', 'Rhythmic Innovation', 'Cultural Storytelling'],
+    languages: ['English', 'Bahasa Malaysia', 'Iban'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 130, description: '60 mins' },
+      { id: 'p2', name: '10 Lessons', lessons: 10, price: 1170, validityMonths: 5 }
+    ],
+    reviews: [
+      { id: 'r11', studentName: 'Alex G.', lessonsTaken: 20, rating: 5, comment: 'Uncle Jerry is a legend. His Sape playing is so inspiring.', timeAgo: '2 days ago' },
+      { id: 'r11_2', studentName: 'Sarah W.', lessonsTaken: 10, rating: 5, comment: 'The studio in Kuching is beautiful. A perfect place to learn Sape.', timeAgo: '1 week ago' }
+    ],
+    credentials: ['Rainforest World Music Festival Regular', 'Sarawak State Arts Award'],
+    gallery: [
+      'https://picsum.photos/seed/jerry1/400/300',
+      'https://picsum.photos/seed/jerry2/400/300',
+      'https://picsum.photos/seed/jerrystudio1/400/300',
+      'https://picsum.photos/seed/jerrystudio2/400/300'
+    ]
+  },
+  {
+    id: 'm11',
+    name: 'Alena Murang',
+    tagline: 'Voice of the Kelabit Highlands',
+    photo: 'https://picsum.photos/seed/alena/200',
+    rating: 4.97,
+    reviewCount: 120,
+    location: 'Miri, Sarawak',
+    address: 'Miri Waterfront, 98000 Miri',
+    pricePerLesson: 140,
+    studentsCount: 40,
+    experienceYears: 10,
+    about: 'I teach the Sape as a medium for storytelling and cultural preservation, focusing on the Kelabit tradition.',
+    specialisation: ['Sape'],
+    teachingStyle: ['Visual Arts Integration', 'Storytelling', 'Traditional Chants'],
+    languages: ['English', 'Bahasa Malaysia', 'Kelabit'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 140, description: '60 mins' }
+    ],
+    reviews: [
+      { id: 'r12', studentName: 'Maya K.', lessonsTaken: 12, rating: 5, comment: 'Alena is an inspiration. Her Sape lessons are deeply connected to her culture.', timeAgo: '3 days ago' },
+      { id: 'r12_2', studentName: 'John D.', lessonsTaken: 5, rating: 5, comment: 'The studio in Miri is such a creative space. I love the storytelling aspect.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['Forbes 30 Under 30 Asia', 'Best Music Video - UK Music Video Awards'],
+    gallery: [
+      'https://picsum.photos/seed/alena1/400/300',
+      'https://picsum.photos/seed/alena2/400/300',
+      'https://picsum.photos/seed/alenastudio1/400/300',
+      'https://picsum.photos/seed/alenastudio2/400/300'
+    ]
+  },
+  {
+    id: 'm12',
+    name: 'Cikgu Roslan',
+    tagline: 'Guardian of Mak Yong Traditions',
+    photo: 'https://picsum.photos/seed/roslan/200',
+    rating: 4.89,
+    reviewCount: 52,
+    location: 'Kota Bharu, Kelantan',
+    address: 'Jalan Sultanah Zainab, 15000 Kota Bharu',
+    pricePerLesson: 70,
+    studentsCount: 20,
+    experienceYears: 25,
+    about: 'Dedicated to the Rebab and its role in Mak Yong. I teach the deep spiritual connection of Kelantanese music.',
+    specialisation: ['Rebab', 'Biola Melayu'],
+    teachingStyle: ['Spiritual Focus', 'Improvisation', 'Traditional Repertoire'],
+    languages: ['Bahasa Malaysia (Kelantan Dialect)', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 70, description: '60 mins' },
+      { id: 'p2', name: '12 Lessons', lessons: 12, price: 756, validityMonths: 6 }
+    ],
+    reviews: [
+      { id: 'r13', studentName: 'Hafiz M.', lessonsTaken: 15, rating: 5, comment: 'Cikgu Roslan is a master of the Rebab. His teaching is deeply rooted in tradition.', timeAgo: '1 week ago' },
+      { id: 'r13_2', studentName: 'Siti K.', lessonsTaken: 8, rating: 4.8, comment: 'The studio in Kota Bharu is a wonderful place to learn Kelantanese music.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['Mak Yong Master Teacher', 'Kelantan State Heritage Icon'],
+    gallery: [
+      'https://picsum.photos/seed/roslan1/400/300',
+      'https://picsum.photos/seed/roslan2/400/300',
+      'https://picsum.photos/seed/roslanstudio1/400/300',
+      'https://picsum.photos/seed/roslanstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm13',
+    name: 'Guru Subramaniam',
+    tagline: 'Precision and Power in Tabla',
+    photo: 'https://picsum.photos/seed/subra/200',
+    rating: 4.91,
+    reviewCount: 68,
+    location: 'Ipoh, Perak',
+    address: 'Little India, 30000 Ipoh',
+    pricePerLesson: 90,
+    studentsCount: 30,
+    experienceYears: 16,
+    about: 'Focusing on the Farukhabad Gharana, I emphasize technical precision and the mathematical beauty of Tabla.',
+    specialisation: ['Tabla'],
+    teachingStyle: ['Mathematical Approach', 'Speed Drills', 'Composition Focus'],
+    languages: ['English', 'Tamil', 'Bahasa Malaysia'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 90, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 648, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r14', studentName: 'Vikram S.', lessonsTaken: 12, rating: 5, comment: 'Guru Subramaniam is a master of rhythm. His mathematical approach is very clear.', timeAgo: '1 week ago' },
+      { id: 'r14_2', studentName: 'Meena P.', lessonsTaken: 6, rating: 4.9, comment: 'The studio in Ipoh is a great place to learn Tabla. Highly recommend!', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['Gold Medalist - All Malaysia Tabla Competition', 'Music Lecturer at UPSI'],
+    gallery: [
+      'https://picsum.photos/seed/subra1/400/300',
+      'https://picsum.photos/seed/subra2/400/300',
+      'https://picsum.photos/seed/subrastudio1/400/300',
+      'https://picsum.photos/seed/subrastudio2/400/300'
+    ]
+  },
+  {
+    id: 'm14',
+    name: 'Master Zhang',
+    tagline: 'The Rapid Plucking of the Pipa',
+    photo: 'https://picsum.photos/seed/zhang/200',
+    rating: 4.93,
+    reviewCount: 110,
+    location: 'Johor Bahru, Johor',
+    address: 'Taman Pelangi, 80400 Johor Bahru',
+    pricePerLesson: 115,
+    studentsCount: 42,
+    experienceYears: 20,
+    about: 'The Pipa is an instrument of fire and water. I teach the rapid plucking techniques that define this ancient lute.',
+    specialisation: ['Pipa', 'Erhu'],
+    teachingStyle: ['Virtuosic Technique', 'Historical Narrative', 'Rigorous Practice'],
+    languages: ['Mandarin', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 115, description: '60 mins' },
+      { id: 'p2', name: '10 Lessons', lessons: 10, price: 1035, validityMonths: 5 }
+    ],
+    reviews: [
+      { id: 'r15', studentName: 'Li Na', lessonsTaken: 15, rating: 5, comment: 'Master Zhang is a virtuoso. The Pipa lessons are very challenging but rewarding.', timeAgo: '1 week ago' },
+      { id: 'r15_2', studentName: 'Wong J.', lessonsTaken: 8, rating: 4.9, comment: 'The studio in JB is very well-maintained. I enjoy learning Erhu here.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['China National Orchestra Member', 'Johor Arts Council Consultant'],
+    gallery: [
+      'https://picsum.photos/seed/zhang1/400/300',
+      'https://picsum.photos/seed/zhang2/400/300',
+      'https://picsum.photos/seed/zhangstudio1/400/300',
+      'https://picsum.photos/seed/zhangstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm15',
+    name: 'Cikgu Zainal',
+    tagline: 'The Rhythms of Johor Ghazal',
+    photo: 'https://picsum.photos/seed/zainal/200',
+    rating: 4.86,
+    reviewCount: 45,
+    location: 'Muar, Johor',
+    address: 'Jalan Maharani, 84000 Muar',
+    pricePerLesson: 80,
+    studentsCount: 18,
+    experienceYears: 28,
+    about: 'Specializing in the Gambus for Johor Ghazal. I focus on the rhythmic interplay between the strings and the ensemble.',
+    specialisation: ['Gambus'],
+    teachingStyle: ['Ensemble Based', 'Rhythmic Focus', 'Oral Tradition'],
+    languages: ['Bahasa Malaysia'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 80, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 576, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r16', studentName: 'Faisal R.', lessonsTaken: 10, rating: 5, comment: 'Cikgu Zainal is a master of the Gambus. His teaching is very traditional and authentic.', timeAgo: '1 week ago' },
+      { id: 'r16_2', studentName: 'Aisha M.', lessonsTaken: 5, rating: 4.7, comment: 'The studio in Muar is a great place to learn Ghazal music.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['Ghazal Muar Master', 'National Arts & Culture Department Award'],
+    gallery: [
+      'https://picsum.photos/seed/zainal1/400/300',
+      'https://picsum.photos/seed/zainal2/400/300',
+      'https://picsum.photos/seed/zainalstudio1/400/300',
+      'https://picsum.photos/seed/zainalstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm16',
+    name: 'Guru Lakshmi',
+    tagline: 'Soulful Melodies of the Bansuri',
+    photo: 'https://picsum.photos/seed/lakshmi/200',
+    rating: 4.95,
+    reviewCount: 82,
+    location: 'Klang, Selangor',
+    address: 'Bandar Bukit Tinggi, 41200 Klang',
+    pricePerLesson: 100,
+    studentsCount: 28,
+    experienceYears: 15,
+    about: 'I teach the Bansuri with a focus on Carnatic ragas and the spiritual essence of the bamboo flute.',
+    specialisation: ['Bansuri Flute'],
+    teachingStyle: ['Devotional Music', 'Raga Foundation', 'Breath Mastery'],
+    languages: ['English', 'Tamil', 'Malayalam'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 100, description: '60 mins' },
+      { id: 'p2', name: '12 Lessons', lessons: 12, price: 1080, validityMonths: 6 }
+    ],
+    reviews: [
+      { id: 'r17', studentName: 'Karthik R.', lessonsTaken: 12, rating: 5, comment: 'Guru Lakshmi is a wonderful teacher. The Bansuri lessons are very meditative.', timeAgo: '1 week ago' },
+      { id: 'r17_2', studentName: 'Divya S.', lessonsTaken: 6, rating: 4.9, comment: 'The studio in Klang is a peaceful place to learn. I love the Carnatic ragas.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['M.A. Music - Annamalai University', 'Temple Music Festival Coordinator'],
+    gallery: [
+      'https://picsum.photos/seed/lakshmi1/400/300',
+      'https://picsum.photos/seed/lakshmi2/400/300',
+      'https://picsum.photos/seed/lakshmistudio1/400/300',
+      'https://picsum.photos/seed/lakshmistudio2/400/300'
+    ]
+  },
+  {
+    id: 'm17',
+    name: 'Master Liu',
+    tagline: 'The Buzzing Spirit of the Dizi',
+    photo: 'https://picsum.photos/seed/liu/200',
+    rating: 4.84,
+    reviewCount: 60,
+    location: 'Melaka City, Melaka',
+    address: 'Jonker Street, 75200 Melaka',
+    pricePerLesson: 85,
+    studentsCount: 22,
+    experienceYears: 12,
+    about: 'Specializing in the Dizi and Xiao. I focus on the unique timbres and techniques of Southern Chinese flute music.',
+    specialisation: ['Dizi'],
+    teachingStyle: ['Timbre Focus', 'Southern Style', 'Modern Interpretation'],
+    languages: ['Mandarin', 'English', 'Bahasa Malaysia'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 85, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 612, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r18', studentName: 'Chen W.', lessonsTaken: 10, rating: 5, comment: 'Master Liu is very patient. The Dizi lessons are very clear and easy to follow.', timeAgo: '1 week ago' },
+      { id: 'r18_2', studentName: 'Lee K.', lessonsTaken: 5, rating: 4.8, comment: 'The studio in Melaka is very charming. I love learning Dizi here.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['Nanjing Arts Institute Graduate', 'Melaka Cultural Heritage Award'],
+    gallery: [
+      'https://picsum.photos/seed/liu1/400/300',
+      'https://picsum.photos/seed/liu2/400/300',
+      'https://picsum.photos/seed/liustudio1/400/300',
+      'https://picsum.photos/seed/liustudio2/400/300'
+    ]
+  },
+  {
+    id: 'm18',
+    name: 'Uncle Arthur Borman',
+    tagline: 'Echoes of the Borneo Rainforest',
+    photo: 'https://picsum.photos/seed/arthur/200',
+    rating: 4.96,
+    reviewCount: 95,
+    location: 'Kota Kinabalu, Sabah',
+    address: 'Tanjung Aru, 88100 Kota Kinabalu',
+    pricePerLesson: 110,
+    studentsCount: 35,
+    experienceYears: 30,
+    about: 'I teach the Turali (nose flute) and Tongkungon, preserving the ancient sounds of the Kadazan-Dusun people.',
+    specialisation: ['Turali', 'Tongkungon'],
+    teachingStyle: ['Nature Mimicry', 'Oral Tradition', 'Spiritual Connection'],
+    languages: ['English', 'Bahasa Malaysia', 'Kadazan'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 110, description: '60 mins' },
+      { id: 'p2', name: '10 Lessons', lessons: 10, price: 990, validityMonths: 5 }
+    ],
+    reviews: [
+      { id: 'r19', studentName: 'Benoit P.', lessonsTaken: 15, rating: 5, comment: 'Uncle Arthur is a true guardian of tradition. The Turali lessons are very unique.', timeAgo: '1 week ago' },
+      { id: 'r19_2', studentName: 'Lina M.', lessonsTaken: 8, rating: 4.9, comment: 'The studio in KK is a wonderful place to learn Kadazan-Dusun music.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['Sabah Cultural Board Master Artist', 'Living Human Treasure Award'],
+    gallery: [
+      'https://picsum.photos/seed/arthur1/400/300',
+      'https://picsum.photos/seed/arthur2/400/300',
+      'https://picsum.photos/seed/arthurstudio1/400/300',
+      'https://picsum.photos/seed/arthurstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm19',
+    name: 'Cikgu Farah',
+    tagline: 'Elegant Strings of Asli Music',
+    photo: 'https://picsum.photos/seed/farah/200',
+    rating: 4.9,
+    reviewCount: 48,
+    location: 'Kuala Terengganu, Terengganu',
+    address: 'Jalan Sultan Sulaiman, 20000 Kuala Terengganu',
+    pricePerLesson: 80,
+    studentsCount: 24,
+    experienceYears: 10,
+    about: 'Specializing in the Biola Melayu for Asli and Keroncong music. I focus on the lyrical and expressive qualities of the violin.',
+    specialisation: ['Biola Melayu'],
+    teachingStyle: ['Lyrical Focus', 'Keroncong Style', 'Modern Adaptation'],
+    languages: ['Bahasa Malaysia', 'English'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 80, description: '60 mins' },
+      { id: 'p2', name: '8 Lessons', lessons: 8, price: 576, validityMonths: 4 }
+    ],
+    reviews: [
+      { id: 'r20', studentName: 'Aiman Z.', lessonsTaken: 10, rating: 5, comment: 'Cikgu Farah is a wonderful teacher. The Biola Melayu lessons are very expressive.', timeAgo: '1 week ago' },
+      { id: 'r20_2', studentName: 'Sofia H.', lessonsTaken: 5, rating: 4.8, comment: 'The studio in KT is very peaceful. I love learning Keroncong music here.', timeAgo: '2 weeks ago' }
+    ],
+    credentials: ['B.Mus - ASWARA', 'Terengganu State Music Festival Winner'],
+    gallery: [
+      'https://picsum.photos/seed/farah1/400/300',
+      'https://picsum.photos/seed/farah2/400/300',
+      'https://picsum.photos/seed/farahstudio1/400/300',
+      'https://picsum.photos/seed/farahstudio2/400/300'
+    ]
+  },
+  {
+    id: 'm20',
+    name: 'Guru Lakshmi Devi',
+    tagline: 'The Soulful Sitar',
+    photo: 'https://picsum.photos/seed/lakshmidevi/200',
+    rating: 4.96,
+    reviewCount: 105,
+    location: 'Seremban, Negeri Sembilan',
+    address: 'Taman Rasah, 70300 Seremban',
+    pricePerLesson: 105,
+    studentsCount: 38,
+    experienceYears: 20,
+    about: 'I teach the Sitar with a focus on the Maihar Gharana, emphasizing the deep emotional resonance of the strings.',
+    specialisation: ['Sitar'],
+    teachingStyle: ['Gharana Tradition', 'Raga Mastery', 'Emotional Depth'],
+    languages: ['English', 'Tamil', 'Hindi'],
+    isVerified: true,
+    packages: [
+      { id: 'p0', name: 'Free Trial', lessons: 0, price: 0, description: '30 mins · Free' },
+      { id: 'p1', name: 'Single Session', lessons: 1, price: 105, description: '60 mins' },
+      { id: 'p2', name: '12 Lessons', lessons: 12, price: 1134, validityMonths: 6 }
+    ],
+    reviews: [
+      { id: 'r21', studentName: 'Ravi P.', lessonsTaken: 15, rating: 5, comment: 'Guru Lakshmi Devi is a master of the Sitar. Her teaching is deeply emotional.', timeAgo: '1 week ago' },
+      { id: 'r21_2', studentName: 'Anusha K.', lessonsTaken: 8, rating: 4.9, comment: 'The studio in Seremban is a peaceful place to learn. I love the Sitar ragas.', timeAgo: '3 weeks ago' }
+    ],
+    credentials: ['Sangeet Alankar', 'Performed at International Sitar Festival'],
+    gallery: [
+      'https://picsum.photos/seed/lakshmidevi1/400/300',
+      'https://picsum.photos/seed/lakshmidevi2/400/300',
+      'https://picsum.photos/seed/lakshmidevistudio1/400/300',
+      'https://picsum.photos/seed/lakshmidevistudio2/400/300'
     ]
   }
 ];
@@ -694,7 +1330,7 @@ const BottomSheet = ({ isOpen, onClose, title, children, dark = true }: { isOpen
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'tween', ease: 'circOut', duration: 0.3 }}
+          transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
           className={`fixed bottom-0 left-0 right-0 z-[201] rounded-t-[2.5rem] max-h-[92vh] overflow-y-auto ${dark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'}`}
           onClick={e => e.stopPropagation()}
         >
@@ -753,6 +1389,19 @@ export default function App() {
   const [recurringTime, setRecurringTime] = useState<string | null>(null);
   const [isTrialConfirmed, setIsTrialConfirmed] = useState(false);
   const [isTrialCompleted, setIsTrialCompleted] = useState(false);
+
+  // Calendar & Time Data for Booking
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dates = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const timeSlots = {
+    morning: ['9:00 AM', '10:00 AM', '11:00 AM'],
+    afternoon: ['2:00 PM', '4:00 PM'],
+    evening: ['6:00 PM', '7:00 PM', '8:00 PM']
+  };
 
   // Theme State
   const [preferredTheme, setPreferredTheme] = useState<'light' | 'dark' | null>(null);
@@ -919,7 +1568,7 @@ export default function App() {
                       setSelectedChat(mentor);
                       setStudentView('messages');
                     }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all active:scale-90 ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-black/5 border-black/5 text-zinc-900 hover:bg-black/10'}`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-black/5 border-black/5 text-zinc-900 hover:bg-black/10'}`}
                   >
                     <MessageSquare size={16} />
                   </button>
@@ -935,6 +1584,7 @@ export default function App() {
   const BookTrialView = () => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
+    const [studentNote, setStudentNote] = useState('');
     const [bookingStep, setBookingStep] = useState<'datetime' | 'confirm'>('datetime');
     const dark = true;
 
@@ -1000,6 +1650,16 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </section>
+
+            <section>
+              <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-4 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Add a Note (Optional)</h2>
+              <textarea 
+                value={studentNote}
+                onChange={(e) => setStudentNote(e.target.value)}
+                placeholder="Tell the mentor about your experience or what you'd like to learn..."
+                className={`w-full p-4 rounded-2xl border text-sm focus:outline-none transition-all h-32 resize-none ${dark ? 'bg-white/5 border-white/10 text-white focus:border-harbour-500' : 'bg-white border-zinc-200 text-zinc-900 focus:border-harbour-500'}`}
+              />
             </section>
 
             <button 
@@ -1166,22 +1826,6 @@ export default function App() {
 
     const currentViewIsDark = getViewTheme(studentView);
 
-    // Calendar Data
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dates = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-
-    const timeSlots = {
-      morning: ['9:00 AM', '10:00 AM', '11:00 AM'],
-      afternoon: ['2:00 PM', '4:00 PM'],
-      evening: ['6:00 PM', '8:00 PM', '10:00 PM']
-    };
-
-    const selectedMentor = MOCK_MENTORS[0]; // Default for sheets
-
     return (
       <div className={`h-full flex flex-col transition-colors duration-500 ${currentViewIsDark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
         <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -1221,9 +1865,7 @@ export default function App() {
 
         {/* Bottom Nav */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%]">
-          <div className={`backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 ${
-            currentViewIsDark ? 'bg-white/10 border-white/10' : 'bg-white/80 border-black/5'
-          }`}>
+          <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
             {[
               { id: 'home', icon: HomeIcon, label: 'Home' },
               { id: 'journey', icon: Music2, label: 'Journey' },
@@ -1235,15 +1877,15 @@ export default function App() {
                 onClick={() => setStudentView(item.id as StudentView)}
                 className={`relative flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-300 ${
                   studentView === item.id 
-                    ? currentViewIsDark ? 'text-white' : 'text-zinc-900' 
+                    ? 'text-white' 
                     : 'text-zinc-400 opacity-50 hover:opacity-100'
                 }`}
               >
                 {studentView === item.id && (
                   <motion.div 
                     layoutId="activeNavStudent"
-                    className={`absolute inset-0 rounded-2xl z-0 ${currentViewIsDark ? 'bg-white/10' : 'bg-black/5'}`}
-                    transition={{ type: 'tween', ease: 'circOut', duration: 0.3 }}
+                    className="absolute inset-0 rounded-2xl z-0 bg-white/10"
+                    transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
                   />
                 )}
                 <div className="relative z-10 flex flex-col items-center gap-1">
@@ -1254,441 +1896,6 @@ export default function App() {
             ))}
           </div>
         </div>
-
-        {/* Global Bottom Sheets */}
-        <BottomSheet 
-          isOpen={showScheduleSheet} 
-          onClose={() => setShowScheduleSheet(false)}
-          title="March 2026"
-        >
-          <div className="px-6 pb-10">
-            <div className="flex justify-between items-center mb-6">
-              <button className="text-[10px] font-bold text-harbour-400 uppercase tracking-widest">Today</button>
-              <div className="flex gap-4">
-                <ChevronLeft size={20} className="text-white/20" />
-                <ChevronRight size={20} className="text-white" />
-              </div>
-            </div>
-
-            <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
-              {dates.map((date, i) => {
-                const isSelected = bookingDate === date.toDateString();
-                const isAvailable = i % 3 !== 0; 
-                return (
-                  <button 
-                    key={i}
-                    onClick={() => isAvailable && setBookingDate(date.toDateString())}
-                    className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
-                  >
-                    <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
-                    <span className="text-sm font-bold">{date.getDate()}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="space-y-8 mt-4">
-              {Object.entries(timeSlots).map(([category, slots]) => (
-                <div key={category}>
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2">
-                    {category === 'morning' ? 'Morning Slots' : category === 'afternoon' ? 'Afternoon Slots' : 'Evening Slots'}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {slots.map(slot => (
-                      <div key={slot} className={`px-4 py-2 rounded-full text-[10px] font-bold border ${slot === '10:00 AM' ? 'bg-white/5 border-white/10 text-white/20 line-through' : 'bg-white text-black border-white'}`}>
-                        {slot}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </BottomSheet>
-
-        <BottomSheet 
-          isOpen={showBookingSheet} 
-          onClose={() => {
-            setShowBookingSheet(false);
-            setBookingSuccess(null);
-            setBookingStep(1);
-          }}
-        >
-          <div className="px-6 pb-10">
-            {bookingSuccess ? (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }} 
-                animate={{ opacity: 1, scale: 1 }} 
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                className="text-center py-10"
-              >
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl ${bookingSuccess.type === 'trial' ? 'bg-harbour-500 shadow-harbour-500/20' : 'bg-emerald-500 shadow-emerald-500/20'}`}>
-                  <CheckCircle2 size={40} className="text-white" />
-                </div>
-                <h3 className="text-2xl font-serif-sturdy mb-2">
-                  {bookingSuccess.type === 'trial' ? 'Booking Confirmed!' : 'Payment Successful!'}
-                </h3>
-                <p className="text-sm text-white/60 mb-8">
-                  {bookingSuccess.type === 'trial' 
-                    ? `You have successfully booked a trial lesson with ${bookingSuccess.mentor}.`
-                    : `You have successfully booked your lessons with ${bookingSuccess.mentor}.`}
-                </p>
-                <button 
-                  onClick={() => {
-                    setShowBookingSheet(false);
-                    setBookingSuccess(null);
-                    setBookingStep(1);
-                    setStudentView('journey');
-                  }}
-                  className="w-full py-5 bg-white text-black font-bold rounded-full"
-                >
-                  View in My Journey
-                </button>
-              </motion.div>
-            ) : (
-              <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center gap-4 mb-4">
-                  <img src={selectedMentor.photo} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
-                  <div>
-                    <h3 className="text-sm font-serif-sturdy">{selectedMentor.name}</h3>
-                    <p className="text-[9px] text-white/40 uppercase tracking-widest">
-                      {bookingType === 'single' ? 'Single Session • 60 Mins • RM 60' : 
-                       bookingType === 'trial' ? 'Free Trial • 30 Mins • FREE' : 
-                       selectedPackage ? `${selectedPackage.name} • ${selectedPackage.lessons} Lessons` : 'Select a Package'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Multi-step Content */}
-                {bookingType === 'single' && (
-                  <>
-                    {bookingStep === 1 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <div className="p-6 bg-white/5 rounded-3xl border border-white/10">
-                          <h4 className="text-lg font-serif-sturdy mb-2">Single Session</h4>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-white/40">Duration</span>
-                            <span className="font-bold">60 Minutes</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs mt-2">
-                            <span className="text-white/40">Price</span>
-                            <span className="font-bold text-harbour-400">RM 60</span>
-                          </div>
-                        </div>
-                        <button onClick={() => setBookingStep(2)} className="w-full py-5 bg-white text-black font-bold rounded-full">Pick Date</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 2 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-serif-sturdy">March 2026</h4>
-                          <div className="flex gap-2">
-                            <ChevronLeft size={18} className="text-white/20" />
-                            <ChevronRight size={18} className="text-white" />
-                          </div>
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                          {dates.map((date, i) => {
-                            const isSelected = bookingDate === date.toDateString();
-                            const isAvailable = i % 3 !== 0;
-                            return (
-                              <button 
-                                key={i}
-                                onClick={() => isAvailable && setBookingDate(date.toDateString())}
-                                className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
-                              >
-                                <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
-                                <span className="text-sm font-bold">{date.getDate()}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <button disabled={!bookingDate} onClick={() => setBookingStep(3)} className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50">Next: Pick Time</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 3 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        {Object.entries(timeSlots).map(([category, slots]) => (
-                          <div key={category}>
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">
-                              {category === 'morning' ? 'Morning Slots' : category === 'afternoon' ? 'Afternoon Slots' : 'Evening Slots'}
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {slots.map(slot => (
-                                <button 
-                                  key={slot}
-                                  onClick={() => setBookingTime(slot)}
-                                  className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${bookingTime === slot ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
-                                >
-                                  {slot}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <button disabled={!bookingTime} onClick={() => setBookingStep(4)} className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50">View Summary</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 4 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
-                          <h4 className="text-lg font-serif-sturdy">Summary</h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Mentor</span><span className="font-bold">{selectedMentor.name}</span></div>
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Date</span><span className="font-bold">{bookingDate}</span></div>
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Time</span><span className="font-bold">{bookingTime}</span></div>
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Duration</span><span className="font-bold">60 Mins</span></div>
-                            <div className="pt-2 border-t border-white/10 flex justify-between"><span className="text-sm font-bold">Total Price</span><span className="text-lg font-serif-sturdy text-harbour-400">RM 60</span></div>
-                          </div>
-                        </div>
-                        <button onClick={() => setBookingStep(5)} className="w-full py-5 bg-harbour-500 text-white font-bold rounded-full">Proceed to Payment</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 5 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30">Select Payment Method</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          {['Card', 'FPX', 'Touch n Go', 'Boost'].map(method => (
-                            <button key={method} className="p-4 rounded-2xl border border-white/10 bg-white/5 text-xs font-bold hover:bg-white hover:text-black transition-all">{method}</button>
-                          ))}
-                        </div>
-                        <button onClick={() => setBookingSuccess({ type: 'single', mentor: selectedMentor.name })} className="w-full py-5 bg-harbour-500 text-white font-bold rounded-full">Confirm Payment</button>
-                      </motion.div>
-                    )}
-                  </>
-                )}
-
-                {bookingType === 'package' && (
-                  <>
-                    {bookingStep === 1 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                        <h4 className="text-xl font-serif-sturdy mb-4">Pick a package</h4>
-                        <div className="grid gap-3">
-                          {selectedMentor.packages.filter(p => p.id !== 'p0').map(pkg => (
-                            <button 
-                              key={pkg.id}
-                              onClick={() => {
-                                setSelectedPackage(pkg);
-                                setBookingStep(2);
-                              }}
-                              className="p-5 border border-white/10 bg-white/5 rounded-[2rem] flex justify-between items-center text-left"
-                            >
-                              <div>
-                                <h4 className="font-bold text-white">{pkg.name}</h4>
-                                <p className="text-[10px] text-white/40">{pkg.description || `${pkg.lessons} Lessons • Valid ${pkg.validityMonths}m`}</p>
-                              </div>
-                              <p className="text-lg font-serif-sturdy">RM {pkg.price}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 2 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30">Which day every week?</h4>
-                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                            <button 
-                              key={day}
-                              onClick={() => setRecurringDay(day)}
-                              className={`flex-shrink-0 px-5 py-3 rounded-2xl text-xs font-bold border transition-all ${recurringDay === day ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white/40'}`}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                        <button disabled={!recurringDay} onClick={() => setBookingStep(3)} className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50">Next: Pick Time</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 3 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        {Object.entries(timeSlots).map(([category, slots]) => (
-                          <div key={category}>
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">
-                              {category === 'morning' ? 'Morning Slots' : category === 'afternoon' ? 'Afternoon Slots' : 'Evening Slots'}
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {slots.map(slot => (
-                                <button 
-                                  key={slot}
-                                  onClick={() => setRecurringTime(slot)}
-                                  className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${recurringTime === slot ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
-                                >
-                                  {slot}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <button disabled={!recurringTime} onClick={() => setBookingStep(4)} className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50">Next: Start Date</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 4 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30">Pick Start Date</h4>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                          {dates.map((date, i) => {
-                            const isSelected = bookingDate === date.toDateString();
-                            const isCorrectDay = days[date.getDay()].startsWith(recurringDay || '');
-                            return (
-                              <button 
-                                key={i}
-                                onClick={() => isCorrectDay && setBookingDate(date.toDateString())}
-                                className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isCorrectDay ? 'bg-white/5 text-white/60' : 'opacity-10 grayscale pointer-events-none'}`}
-                              >
-                                <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
-                                <span className="text-sm font-bold">{date.getDate()}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <button disabled={!bookingDate} onClick={() => setBookingStep(5)} className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50">View Summary</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 5 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
-                        <div className="p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
-                          <h4 className="text-lg font-serif-sturdy">Summary</h4>
-                          <div className="space-y-3">
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Package</span><span className="font-bold">{selectedPackage?.name}</span></div>
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Schedule</span><span className="font-bold">Every {recurringDay} @ {recurringTime}</span></div>
-                            <div className="flex justify-between text-xs"><span className="text-white/40">Start Date</span><span className="font-bold">{bookingDate}</span></div>
-                            
-                            <div className="pt-4 border-t border-white/10">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">All Lesson Dates</p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {Array.from({ length: selectedPackage?.lessons || 0 }).map((_, i) => (
-                                  <div key={i} className="px-3 py-2 bg-white/5 rounded-xl text-[10px] font-bold text-white/60">
-                                    Lesson {i + 1}: {new Date(new Date(bookingDate || '').getTime() + i * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-white/10">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-bold">Total Price</span>
-                                <span className="text-xl font-serif-sturdy text-harbour-400">RM {selectedPackage?.price}</span>
-                              </div>
-                              {selectedPackage?.id === 'p3' && (
-                                <p className="text-[9px] text-harbour-400/60 mt-2 italic">Auto renews every month • Cancel anytime</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <button onClick={() => setBookingStep(6)} className="w-full py-5 bg-harbour-500 text-white font-bold rounded-full">Proceed to Payment</button>
-                      </motion.div>
-                    )}
-
-                    {bookingStep === 6 && (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30">Select Payment Method</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          {['Card', 'FPX', 'Touch n Go', 'Boost'].map(method => (
-                            <button key={method} className="p-4 rounded-2xl border border-white/10 bg-white/5 text-xs font-bold hover:bg-white hover:text-black transition-all">{method}</button>
-                          ))}
-                        </div>
-                        <button onClick={() => setBookingSuccess({ type: 'package', mentor: selectedMentor.name })} className="w-full py-5 bg-harbour-500 text-white font-bold rounded-full">Confirm Payment</button>
-                      </motion.div>
-                    )}
-                  </>
-                )}
-
-                {bookingType === 'trial' && (
-                  <>
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="font-serif-sturdy">March 2026</h4>
-                      <div className="flex gap-4">
-                        <button className="text-[10px] font-bold text-harbour-400 uppercase tracking-widest">Today</button>
-                        <div className="flex gap-2">
-                          <ChevronLeft size={18} className="text-white/20" />
-                          <ChevronRight size={18} className="text-white" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
-                      {dates.map((date, i) => {
-                        const isSelected = bookingDate === date.toDateString();
-                        const isAvailable = i % 3 !== 0;
-                        return (
-                          <button 
-                            key={i}
-                            onClick={() => isAvailable && setBookingDate(date.toDateString())}
-                            className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
-                          >
-                            <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
-                            <span className="text-sm font-bold">{date.getDate()}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {bookingDate && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
-                        className="space-y-6 mt-4"
-                      >
-                        {Object.entries(timeSlots).map(([category, slots]) => (
-                          <div key={category}>
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">
-                              {category === 'morning' ? 'Morning Slots' : category === 'afternoon' ? 'Afternoon Slots' : 'Evening Slots'}
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {slots.map(slot => {
-                                const isSelected = bookingTime === slot;
-                                return (
-                                  <button 
-                                    key={slot}
-                                    onClick={() => setBookingTime(slot)}
-                                    className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${isSelected ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
-                                  >
-                                    {slot}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-
-                        <div className="pt-4">
-                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Note to Mentor</h4>
-                          <textarea 
-                            placeholder="Tell your mentor about yourself"
-                            value={bookingNote}
-                            onChange={e => setBookingNote(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-harbour-500 min-h-[100px]"
-                          />
-                        </div>
-
-                        <button 
-                          onClick={() => {
-                            setBookingSuccess({ type: 'trial', mentor: selectedMentor.name });
-                            setIsTrialCompleted(true);
-                          }}
-                          className="w-full py-5 bg-white text-black font-bold rounded-full mt-4"
-                        >
-                          Confirm Free Trial
-                        </button>
-                      </motion.div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </BottomSheet>
       </div>
     );
   };
@@ -1696,20 +1903,6 @@ export default function App() {
     const [expandedSection, setExpandedSection] = useState<'path' | 'packages' | 'schedule' | 'gallery' | 'reviews' | 'credentials' | null>(null);
     const [showTrialRules, setShowTrialRules] = useState(false);
     const dark = true;
-
-    // Calendar Data
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dates = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-
-    const timeSlots = {
-      morning: ['9:00 AM', '10:00 AM', '11:00 AM'],
-      afternoon: ['2:00 PM', '4:00 PM'],
-      evening: ['6:00 PM', '8:00 PM', '10:00 PM']
-    };
 
     if (!selectedMentor) return null;
 
@@ -1837,7 +2030,7 @@ export default function App() {
                                   setBookingStep(1);
                                   setShowBookingSheet(true);
                                 }}
-                                className={`p-2.5 border rounded-xl flex justify-between items-center transition-all active:scale-[0.98] ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:bg-zinc-50'}`}
+                                className={`p-2.5 border rounded-xl flex justify-between items-center transition-all ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:bg-zinc-50'}`}
                               >
                                 <div className="text-left">
                                   <h4 className={`text-[11px] font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{pkg.name}</h4>
@@ -1920,7 +2113,7 @@ export default function App() {
                 setShowBookingSheet(true);
               }
             }}
-            className={`flex-1 font-bold py-4 rounded-full flex items-center justify-center gap-2 shadow-xl transition-all active:scale-95 ${dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'}`}
+            className={`flex-1 font-bold py-4 rounded-full flex items-center justify-center gap-2 shadow-xl transition-all ${dark ? 'bg-white text-black' : 'bg-zinc-900 text-white'}`}
           >
             <Music2 size={18} />
             {isTrialCompleted ? 'Select a Package' : 'Book Free Trial'}
@@ -2105,7 +2298,7 @@ export default function App() {
                   <div className="flex gap-3">
                     <button 
                       onClick={() => setShowRescheduleModal(true)}
-                      className={`flex-1 py-3.5 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all active:scale-95 ${dark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-zinc-900 text-white hover:bg-black shadow-lg shadow-black/10'}`}
+                      className={`flex-1 py-3.5 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${dark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-zinc-900 text-white hover:bg-black shadow-lg shadow-black/10'}`}
                     >
                       Reschedule
                     </button>
@@ -2756,13 +2949,13 @@ export default function App() {
           <div className="flex flex-col gap-3">
             <button 
               onClick={() => setAuthView('role-selection')}
-              className="w-full bg-white text-black font-bold py-5 rounded-[2rem] shadow-xl active:scale-95 transition-transform"
+              className="w-full bg-white text-black font-bold py-5 rounded-[2rem] shadow-xl transition-transform"
             >
               Get Started
             </button>
             <button 
               onClick={() => setAuthView('sign-in')}
-              className="w-full bg-transparent text-white border border-white/20 font-bold py-5 rounded-[2rem] active:scale-95 transition-transform"
+              className="w-full bg-transparent text-white border border-white/20 font-bold py-5 rounded-[2rem] transition-transform"
             >
               Sign In
             </button>
@@ -2847,7 +3040,7 @@ export default function App() {
             <input type="tel" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="+60 12 345 6789" required />
           </div>
 
-          <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl active:scale-95 transition-transform ${role === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
+          <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-transform ${role === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
             {role === 'student' ? 'Create Account' : 'Register'}
           </button>
 
@@ -2930,7 +3123,7 @@ export default function App() {
               </button>
             </div>
 
-            <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl active:scale-95 transition-transform ${roleTab === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
+            <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-transform ${roleTab === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
               Sign In
             </button>
 
@@ -2974,7 +3167,7 @@ export default function App() {
                 <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Email Address</label>
                 <input type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
               </div>
-              <button className="w-full bg-zinc-900 text-white font-bold py-5 rounded-[2rem] shadow-xl active:scale-95 transition-transform">
+              <button className="w-full bg-zinc-900 text-white font-bold py-5 rounded-[2rem] shadow-xl transition-transform">
                 Send Reset Link
               </button>
             </form>
@@ -3021,7 +3214,7 @@ export default function App() {
             <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Confirm New Password</label>
             <input type="password" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="••••••••" required />
           </div>
-          <button className="w-full bg-harbour-600 text-white font-bold py-5 rounded-[2rem] shadow-xl active:scale-95 transition-transform">
+          <button className="w-full bg-harbour-600 text-white font-bold py-5 rounded-[2rem] shadow-xl transition-transform">
             Reset Password
           </button>
         </form>
@@ -3086,17 +3279,67 @@ export default function App() {
         </motion.div>
       )}
 
+      {/* Quick Stats - New */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
+          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Earnings</p>
+          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>$1,240</p>
+          <div className="flex items-center gap-1 mt-1">
+            <div className="w-1 h-1 rounded-full bg-emerald-500" />
+            <span className="text-[7px] text-emerald-500 font-bold">+12%</span>
+          </div>
+        </div>
+        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
+          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Students</p>
+          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>24</p>
+          <div className="flex items-center gap-1 mt-1">
+            <div className="w-1 h-1 rounded-full bg-blue-500" />
+            <span className="text-[7px] text-blue-500 font-bold">Active</span>
+          </div>
+        </div>
+        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
+          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Hours</p>
+          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>32.5</p>
+          <div className="flex items-center gap-1 mt-1">
+            <div className="w-1 h-1 rounded-full bg-amber-500" />
+            <span className="text-[7px] text-amber-500 font-bold">This month</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Insights - New */}
+      <div className="flex gap-3 mb-6 overflow-x-auto pb-2 no-scrollbar">
+        <div className={`flex-shrink-0 w-48 p-3 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+            <TrendingUp size={14} />
+          </div>
+          <div>
+            <p className={`text-[10px] font-bold ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>Peak Performance</p>
+            <p className={`text-[9px] mt-0.5 ${isDark ? 'text-white/60' : 'text-indigo-600/80'}`}>Your students are most active on Tuesdays at 4 PM.</p>
+          </div>
+        </div>
+        <div className={`flex-shrink-0 w-48 p-3 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
+            <Users size={14} />
+          </div>
+          <div>
+            <p className={`text-[10px] font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Growth Opportunity</p>
+            <p className={`text-[9px] mt-0.5 ${isDark ? 'text-white/60' : 'text-emerald-600/80'}`}>3 trial students are ready for their first package.</p>
+          </div>
+        </div>
+      </div>
+
       {/* Tabs Toggle */}
-      <div className="flex gap-1 mb-6 bg-white/5 p-1 rounded-full">
+      <div className={`flex gap-1 mb-6 p-1 rounded-full ${isDark ? 'bg-white/5' : 'bg-zinc-100'}`}>
         <button 
           onClick={() => setHomeTab('today')}
-          className={`flex-1 py-2 rounded-full text-[9px] font-bold transition-all ${homeTab === 'today' ? 'bg-white text-black' : 'text-white/40'}`}
+          className={`flex-1 py-2 rounded-full text-[9px] font-bold transition-all ${homeTab === 'today' ? (isDark ? 'bg-white text-black' : 'bg-white text-zinc-900 shadow-sm') : (isDark ? 'text-white/40' : 'text-zinc-400')}`}
         >
           Today
         </button>
         <button 
           onClick={() => setHomeTab('pending')}
-          className={`flex-1 py-2 rounded-full text-[9px] font-bold transition-all ${homeTab === 'pending' ? 'bg-white text-black' : 'text-white/40'}`}
+          className={`flex-1 py-2 rounded-full text-[9px] font-bold transition-all ${homeTab === 'pending' ? (isDark ? 'bg-white text-black' : 'bg-white text-zinc-900 shadow-sm') : (isDark ? 'text-white/40' : 'text-zinc-400')}`}
         >
           Pending
         </button>
@@ -3104,61 +3347,91 @@ export default function App() {
 
       {homeTab === 'pending' ? (
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <h2 className="text-[9px] uppercase tracking-widest font-bold text-white/40 mb-3 flex items-center gap-2">
-            Requests <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className={`text-[9px] uppercase tracking-widest font-bold flex items-center gap-2 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>
+              Requests <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse" />
+            </h2>
+            <span className={`text-[8px] font-mono ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>
+              {MOCK_LESSONS.filter(l => l.status === 'pending').length} New
+            </span>
+          </div>
           <div className="space-y-3">
             {MOCK_LESSONS.filter(l => l.status === 'pending').map(request => {
               const student = MOCK_STUDENTS.find(s => s.id === request.studentId);
               return (
-                <div key={request.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                <div key={request.id} className={`border p-4 rounded-2xl transition-all hover:shadow-lg ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/[0.07]' : 'bg-white border-zinc-200 hover:border-zinc-300 shadow-sm'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex gap-3 items-center">
                       {/* Student Photo */}
-                      <img 
-                        src={student?.photo || `https://picsum.photos/seed/${request.studentId}/100`} 
-                        className="w-10 h-10 rounded-full object-cover border border-white/10" 
-                        referrerPolicy="no-referrer"
-                        alt={request.studentName}
-                      />
+                      <div className="relative">
+                        <img 
+                          src={student?.photo || `https://picsum.photos/seed/${request.studentId}/100`} 
+                          className={`w-12 h-12 rounded-full object-cover border ${isDark ? 'border-white/10' : 'border-zinc-200'}`} 
+                          referrerPolicy="no-referrer"
+                          alt={request.studentName}
+                        />
+                        {request.type === 'Trial' && (
+                          <div className="absolute -top-1 -right-1 bg-amber-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0A0A0A]">
+                            FREE
+                          </div>
+                        )}
+                      </div>
                       
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <h3 className="text-sm font-medium truncate">{request.studentName}</h3>
+                          <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>{request.studentName}</h3>
                           <Badge variant={request.type === 'Trial' ? 'gold' : request.type === 'Monthly' ? 'harbour' : 'outline'}>
                             {request.type}
                           </Badge>
                         </div>
-                        <p className="text-white/40 text-[9px] truncate">{request.instrument}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-[9px] font-medium ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>{request.instrument}</p>
+                          <span className={`w-0.5 h-0.5 rounded-full ${isDark ? 'bg-white/20' : 'bg-zinc-300'}`} />
+                          <p className={`text-[9px] font-medium ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>New Student</p>
+                        </div>
                       </div>
                     </div>
                     <button 
                       onClick={() => setActiveLessonAction(request)}
-                      className="p-1 text-white/40"
+                      className={`p-1 ${isDark ? 'text-white/40' : 'text-zinc-400'}`}
                     >
                       <MoreVertical size={16} />
                     </button>
                   </div>
 
                   {/* Requested Time Slot */}
-                  <div className="bg-white/[0.03] border border-white/5 rounded-xl p-3 mb-4 flex items-center justify-between">
+                  <div className={`border rounded-xl p-3 mb-4 flex items-center justify-between ${isDark ? 'bg-white/[0.03] border-white/5' : 'bg-zinc-50 border-zinc-100'}`}>
                     <div className="flex items-center gap-3">
-                      <div className="bg-white/10 w-8 h-8 rounded-lg flex items-center justify-center text-white/60">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10 text-white/60' : 'bg-zinc-200 text-zinc-600'}`}>
                         <Calendar size={14} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-tighter text-white/60">
+                        <p className={`text-[10px] font-bold uppercase tracking-tighter ${isDark ? 'text-white/60' : 'text-zinc-500'}`}>
                           {new Date(request.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         </p>
-                        <p className="text-sm font-serif-curvy italic leading-none mt-0.5">{request.time}</p>
+                        <p className={`text-sm font-serif-curvy italic leading-none mt-0.5 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{request.time}</p>
                       </div>
                     </div>
-                    {request.countdown && (
-                      <div className="text-right">
-                        <p className="text-[8px] font-mono uppercase tracking-widest text-red-400/60">Expires in</p>
-                        <p className="text-[10px] font-bold text-red-400">{request.countdown}</p>
-                      </div>
-                    )}
+                  </div>
+
+                  {/* Student Note */}
+                  {request.studentNote && (
+                    <div className={`mb-4 p-3 rounded-xl border-l-2 border-harbour-500 ${isDark ? 'bg-white/[0.03]' : 'bg-zinc-50'}`}>
+                      <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>Student Note</p>
+                      <p className={`text-[10px] leading-relaxed ${isDark ? 'text-white/70' : 'text-zinc-600'}`}>"{request.studentNote}"</p>
+                    </div>
+                  )}
+
+                  {/* Other Packages */}
+                  <div className="mb-4">
+                    <p className={`text-[8px] font-mono uppercase tracking-widest mb-2 ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>Offer Other Packages</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                      {MOCK_MENTORS[0].packages.filter(p => p.id !== 'p0').map(pkg => (
+                        <button key={pkg.id} className={`flex-shrink-0 px-3 py-2 rounded-xl border text-[9px] font-bold transition-all ${isDark ? 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'}`}>
+                          {pkg.name} (RM{pkg.price})
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="flex gap-2">
@@ -3170,14 +3443,14 @@ export default function App() {
                           setView('messages');
                         }
                       }}
-                      className="w-12 bg-white/5 border border-white/10 text-white flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                      className={`w-12 border flex items-center justify-center rounded-full transition-colors ${isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-zinc-100 border-zinc-200 text-zinc-900 hover:bg-zinc-200'}`}
                     >
                       <MessageSquare size={16} />
                     </button>
-                    <button className="flex-1 bg-harbour-600 text-white text-[10px] font-bold py-3 rounded-full hover:bg-harbour-500 transition-colors">
+                    <button className="flex-1 bg-harbour-600 text-white text-[10px] font-bold py-3 rounded-full hover:bg-harbour-500 transition-colors shadow-lg shadow-harbour-600/20">
                       Accept Request
                     </button>
-                    <button className="flex-1 border border-white/10 text-white text-[10px] font-bold py-3 rounded-full hover:bg-white/5 transition-colors">
+                    <button className={`flex-1 border text-[10px] font-bold py-3 rounded-full transition-colors ${isDark ? 'border-white/10 text-white hover:bg-white/5' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}>
                       Decline
                     </button>
                   </div>
@@ -3201,7 +3474,7 @@ export default function App() {
             {MOCK_LESSONS.filter(l => l.status === 'confirmed').map(lesson => {
               const student = MOCK_STUDENTS.find(s => s.id === lesson.studentId);
               return (
-                <div key={lesson.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl relative group active:scale-[0.98] transition-transform">
+                <div key={lesson.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl relative group transition-transform">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex gap-3 items-center">
                       {/* Student Photo */}
@@ -3521,7 +3794,7 @@ export default function App() {
           <p className="text-4xl font-serif-sturdy mb-6">RM {balance.toLocaleString()}</p>
           <button 
             onClick={() => setShowWithdrawModal(true)}
-            className="w-full py-4 bg-white text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+            className="w-full py-4 bg-white text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full flex items-center justify-center gap-2 shadow-xl transition-transform"
           >
             Withdraw to Bank <ArrowUpRight size={14} />
           </button>
@@ -3787,7 +4060,7 @@ export default function App() {
                   referrerPolicy="no-referrer" 
                 />
               </div>
-              <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-zinc-900 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-transform">
+              <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white text-zinc-900 rounded-2xl flex items-center justify-center shadow-xl transition-transform">
                 <Camera size={18} />
               </button>
             </div>
@@ -3849,7 +4122,7 @@ export default function App() {
           <div className="grid grid-cols-1 gap-4">
             <button 
               onClick={() => setShowSetupDetails(true)}
-              className="group relative overflow-hidden p-6 bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+              className="group relative overflow-hidden p-6 bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm hover:shadow-md transition-all"
             >
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-5">
@@ -3868,7 +4141,7 @@ export default function App() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-zinc-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700" />
             </button>
 
-            <button className="group relative overflow-hidden p-6 bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
+            <button className="group relative overflow-hidden p-6 bg-white rounded-[2.5rem] border border-zinc-100 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-5">
                   <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
@@ -3915,7 +4188,7 @@ export default function App() {
 
             <button 
               onClick={() => { setIsAuth(false); setView('registration'); }}
-              className="w-full mt-6 p-6 flex items-center justify-center gap-3 bg-red-50 text-red-600 rounded-[2rem] font-bold text-sm active:scale-95 transition-all"
+              className="w-full mt-6 p-6 flex items-center justify-center gap-3 bg-red-50 text-red-600 rounded-[2rem] font-bold text-sm transition-all"
             >
               <LogOut size={18} />
               Log Out
@@ -3934,7 +4207,7 @@ export default function App() {
               className="fixed inset-0 z-[200] bg-white flex flex-col"
             >
               <header className="px-6 pt-16 pb-6 flex items-center justify-between">
-                <button onClick={() => setIsEditingProfile(false)} className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center active:scale-90 transition-transform">
+                <button onClick={() => setIsEditingProfile(false)} className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center transition-transform">
                   <ChevronLeft size={24} />
                 </button>
                 <h2 className="text-xl font-serif-sturdy">Edit Profile</h2>
@@ -3963,7 +4236,7 @@ export default function App() {
               <div className="p-8 bg-white border-t border-zinc-50">
                 <button 
                   onClick={() => setIsEditingProfile(false)}
-                  className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl active:scale-95 transition-transform"
+                  className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform"
                 >
                   Save Changes
                 </button>
@@ -3983,7 +4256,7 @@ export default function App() {
               className="fixed inset-0 z-[200] bg-zinc-50 flex flex-col"
             >
               <header className="px-6 pt-16 pb-6 bg-white flex items-center justify-between shadow-sm">
-                <button onClick={() => setShowSetupDetails(false)} className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center active:scale-90 transition-transform">
+                <button onClick={() => setShowSetupDetails(false)} className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center transition-transform">
                   <ChevronLeft size={24} />
                 </button>
                 <h2 className="text-xl font-serif-sturdy">Setup & Details</h2>
@@ -3993,7 +4266,7 @@ export default function App() {
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 gap-3">
                   {setupItems.map((item) => (
-                    <button key={item.id} className="w-full p-5 bg-white rounded-[2.5rem] border border-zinc-100 flex items-center justify-between group active:scale-[0.98] transition-all shadow-sm">
+                    <button key={item.id} className="w-full p-5 bg-white rounded-[2.5rem] border border-zinc-100 flex items-center justify-between group transition-all shadow-sm">
                       <div className="flex items-center gap-5">
                         <div className={`w-14 h-14 ${item.status === 'success' ? 'bg-walnut-50 text-walnut-600' : 'bg-amber-50 text-amber-600'} rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500`}>
                           <item.icon size={24} />
@@ -4136,7 +4409,7 @@ export default function App() {
                   {/* Milestone Dot */}
                   <button 
                     onClick={() => toggleMilestone(milestone.id)}
-                    className={`absolute -left-[29px] top-1.5 w-5 h-5 rounded-full border-4 border-zinc-50 flex items-center justify-center z-10 transition-all active:scale-90 ${
+                    className={`absolute -left-[29px] top-1.5 w-5 h-5 rounded-full border-4 border-zinc-50 flex items-center justify-center z-10 transition-all ${
                       milestone.status === 'completed' ? 'bg-harbour-500' : 
                       milestone.status === 'current' ? 'bg-zinc-900' : 'bg-zinc-300'
                     }`}
@@ -4146,7 +4419,7 @@ export default function App() {
 
                   <div 
                     onClick={() => toggleMilestone(milestone.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                       milestone.status === 'completed' ? 'bg-white border-walnut-100 opacity-60' : 
                       milestone.status === 'current' ? 'bg-white border-zinc-900 shadow-md ring-1 ring-zinc-900' : 
                       'bg-white border-zinc-100 opacity-40'
@@ -4307,7 +4580,7 @@ export default function App() {
               </div>
             </div>
 
-            <button className="w-full mt-8 py-4 bg-white text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-xl active:scale-95 transition-transform">
+            <button className="w-full mt-8 py-4 bg-white text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-xl transition-transform">
               Renew Package
             </button>
           </section>
@@ -4493,9 +4766,7 @@ export default function App() {
 
           {/* Mobile Nav */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%]">
-            <div className={`backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 ${
-              isDark ? 'bg-white/10 border-white/10' : 'bg-white/80 border-black/5'
-            }`}>
+            <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
                 { id: 'home', icon: HomeIcon, label: 'Home' },
                 { id: 'students', icon: Users, label: 'Students' },
@@ -4508,15 +4779,15 @@ export default function App() {
                   onClick={() => setView(item.id as View)}
                   className={`relative flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-300 ${
                     view === item.id 
-                      ? isDark ? 'text-white' : 'text-zinc-900' 
+                      ? 'text-white' 
                       : 'text-zinc-400 opacity-50 hover:opacity-100'
                   }`}
                 >
                   {view === item.id && (
                     <motion.div 
                       layoutId="activeNavMentor"
-                      className={`absolute inset-0 rounded-2xl z-0 ${isDark ? 'bg-white/10' : 'bg-black/5'}`}
-                      transition={{ type: 'tween', ease: 'circOut', duration: 0.3 }}
+                      className="absolute inset-0 rounded-2xl z-0 bg-white/10"
+                      transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
                     />
                   )}
                   <div className="relative z-10 flex flex-col items-center gap-1">
@@ -4529,6 +4800,361 @@ export default function App() {
           </div>
         </>
       )}
+
+      {/* Global Bottom Sheets */}
+      <BottomSheet 
+        isOpen={showScheduleSheet} 
+        onClose={() => setShowScheduleSheet(false)}
+        title="March 2026"
+      >
+        <div className="px-6 pb-10">
+          <div className="flex justify-between items-center mb-6">
+            <button className="text-[10px] font-bold text-harbour-400 uppercase tracking-widest">Today</button>
+            <div className="flex gap-4">
+              <ChevronLeft size={20} className="text-white/20" />
+              <ChevronRight size={20} className="text-white" />
+            </div>
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide">
+            {dates.map((date, i) => {
+              const isSelected = bookingDate === date.toDateString();
+              const isAvailable = i % 3 !== 0; 
+              return (
+                <button 
+                  key={i}
+                  onClick={() => isAvailable && setBookingDate(date.toDateString())}
+                  className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
+                >
+                  <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
+                  <span className="text-sm font-bold">{date.getDate()}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-8 mt-4">
+            {Object.entries(timeSlots).map(([category, slots]) => (
+              <div key={category}>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2">
+                  {category === 'morning' ? 'Morning Slots' : category === 'afternoon' ? 'Afternoon Slots' : 'Evening Slots'}
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {slots.map(slot => (
+                    <div key={slot} className={`px-4 py-2 rounded-full text-[10px] font-bold border ${slot === '10:00 AM' ? 'bg-white/5 border-white/10 text-white/20 line-through' : 'bg-white text-black border-white'}`}>
+                      {slot}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet 
+        isOpen={showBookingSheet} 
+        onClose={() => {
+          setShowBookingSheet(false);
+          setBookingSuccess(null);
+          setBookingStep(1);
+        }}
+      >
+        <div className="px-6 pb-10">
+          {bookingSuccess ? (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              transition={{ duration: 0.2, ease: 'linear' }}
+              className="text-center py-10"
+            >
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl ${bookingSuccess.type === 'trial' ? 'bg-harbour-500 shadow-harbour-500/20' : 'bg-emerald-500 shadow-emerald-500/20'}`}>
+                <CheckCircle2 size={40} className="text-white" />
+              </div>
+              <h3 className="text-2xl font-serif-sturdy mb-2">
+                {bookingSuccess.type === 'trial' ? 'Booking Confirmed!' : 'Payment Successful!'}
+              </h3>
+              <p className="text-sm text-white/60 mb-8">
+                {bookingSuccess.type === 'trial' 
+                  ? `You have successfully booked a trial lesson with ${bookingSuccess.mentor}.`
+                  : `You have successfully booked your lessons with ${bookingSuccess.mentor}.`}
+              </p>
+              <button 
+                onClick={() => {
+                  setShowBookingSheet(false);
+                  setBookingSuccess(null);
+                  setBookingStep(1);
+                  setStudentView('journey');
+                }}
+                className="w-full py-5 bg-white text-black font-bold rounded-full"
+              >
+                View in My Journey
+              </button>
+            </motion.div>
+          ) : selectedMentor && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-4">
+                <img src={selectedMentor.photo} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                <div>
+                  <h3 className="text-sm font-serif-sturdy">{selectedMentor.name}</h3>
+                  <p className="text-[9px] text-white/40 uppercase tracking-widest">
+                    {bookingType === 'single' ? 'Single Session • 60 Mins • RM 60' : 
+                     bookingType === 'trial' ? 'Free Trial • 30 Mins • FREE' : 
+                     selectedPackage ? `${selectedPackage.name} • ${selectedPackage.lessons} Lessons` : 'Select a Package'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Consolidated Single Session Flow */}
+              {bookingType === 'single' && (
+                <div className="space-y-8 max-h-[75vh] overflow-y-auto pr-2 scrollbar-hide">
+                  <div className="space-y-8">
+                    {/* Date Selection */}
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">1. Pick Date</h4>
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                        {dates.map((date, i) => {
+                          const isSelected = bookingDate === date.toDateString();
+                          const isAvailable = i % 3 !== 0;
+                          return (
+                            <button 
+                              key={i}
+                              onClick={() => isAvailable && setBookingDate(date.toDateString())}
+                              className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
+                            >
+                              <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
+                              <span className="text-sm font-bold">{date.getDate()}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Time Selection */}
+                    <div className={!bookingDate ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">2. Pick Time</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.values(timeSlots).flat().map(slot => (
+                          <button 
+                            key={slot}
+                            onClick={() => setBookingTime(slot)}
+                            className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${bookingTime === slot ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
+                          >
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Payment Selection */}
+                    <div className={!bookingTime ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                      <div className="space-y-6">
+                        <div>
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">3. Payment Method</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {['Card', 'FPX', 'TNG', 'Boost'].map(method => (
+                              <button key={method} className="p-3 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold hover:bg-white hover:text-black transition-all">{method}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-5 bg-harbour-500/10 rounded-3xl border border-harbour-500/20">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-[10px] text-harbour-400 font-bold uppercase tracking-widest">Total to Pay</p>
+                              <h4 className="text-2xl font-serif-sturdy">RM 60</h4>
+                            </div>
+                            <button 
+                              onClick={() => setBookingSuccess({ type: 'single', mentor: selectedMentor.name })}
+                              className="px-8 py-4 bg-harbour-500 text-white font-bold rounded-full shadow-lg shadow-harbour-500/20"
+                            >
+                              Pay Now
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Consolidated Package Flow */}
+              {bookingType === 'package' && (
+                <div className="space-y-8 max-h-[75vh] overflow-y-auto pr-2 scrollbar-hide">
+                  {/* Package Selection */}
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">1. Select Package</h4>
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                      {selectedMentor.packages.filter(p => p.id !== 'p0').map(pkg => (
+                        <button 
+                          key={pkg.id}
+                          onClick={() => setSelectedPackage(pkg)}
+                          className={`flex-shrink-0 w-40 p-4 rounded-3xl border transition-all text-left ${selectedPackage?.id === pkg.id ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
+                        >
+                          <h4 className="text-xs font-bold mb-1">{pkg.name}</h4>
+                          <p className={`text-[9px] mb-3 ${selectedPackage?.id === pkg.id ? 'text-white/70' : 'text-white/40'}`}>{pkg.lessons} Lessons</p>
+                          <p className="text-lg font-serif-sturdy">RM {pkg.price}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={!selectedPackage ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                    <div className="space-y-8 mt-8">
+                      {/* Weekly Day */}
+                      <div>
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">2. Weekly Day</h4>
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                            <button 
+                              key={day}
+                              onClick={() => setRecurringDay(day)}
+                              className={`flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-bold border transition-all ${recurringDay === day ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white/40'}`}
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preferred Time */}
+                      <div className={!recurringDay ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">3. Preferred Time</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.values(timeSlots).flat().map(slot => (
+                              <button 
+                                key={slot}
+                                onClick={() => setRecurringTime(slot)}
+                                className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${recurringTime === slot ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                      </div>
+
+                      {/* Start Date */}
+                      <div className={!recurringTime ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">4. Start Date</h4>
+                          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                            {dates.map((date, i) => {
+                              const isSelected = bookingDate === date.toDateString();
+                              const isCorrectDay = days[date.getDay()].startsWith(recurringDay || '');
+                              return (
+                                <button 
+                                  key={i}
+                                  onClick={() => isCorrectDay && setBookingDate(date.toDateString())}
+                                  className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isCorrectDay ? 'bg-white/5 text-white/60' : 'opacity-10 grayscale pointer-events-none'}`}
+                                >
+                                  <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
+                                  <span className="text-sm font-bold">{date.getDate()}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                      </div>
+
+                      {/* Payment & Confirm */}
+                      <div className={!bookingDate ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                          <div>
+                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">5. Payment Method</h4>
+                            <div className="grid grid-cols-2 gap-2">
+                              {['Card', 'FPX', 'TNG', 'Boost'].map(method => (
+                                <button key={method} className="p-3 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold hover:bg-white hover:text-black transition-all">{method}</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="p-5 bg-harbour-500/10 rounded-3xl border border-harbour-500/20">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-[10px] text-harbour-400 font-bold uppercase tracking-widest">Total to Pay</p>
+                                <h4 className="text-2xl font-serif-sturdy">RM {selectedPackage.price}</h4>
+                              </div>
+                              <button 
+                                onClick={() => setBookingSuccess({ type: 'package', mentor: selectedMentor.name })}
+                                className="px-8 py-4 bg-harbour-500 text-white font-bold rounded-full shadow-lg shadow-harbour-500/20"
+                              >
+                                Confirm & Pay
+                              </button>
+                            </div>
+                          </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Consolidated Trial Flow */}
+              {bookingType === 'trial' && (
+                <div className="space-y-8 max-h-[75vh] overflow-y-auto pr-2 scrollbar-hide">
+                  <div className="space-y-8">
+                    {/* Date Selection */}
+                    <div>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">1. Pick Date</h4>
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                        {dates.map((date, i) => {
+                          const isSelected = bookingDate === date.toDateString();
+                          const isAvailable = i % 3 !== 0;
+                          return (
+                            <button 
+                              key={i}
+                              onClick={() => isAvailable && setBookingDate(date.toDateString())}
+                              className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${isSelected ? 'bg-harbour-500 text-white' : isAvailable ? 'bg-white/5 text-white/60' : 'opacity-20 grayscale'}`}
+                            >
+                              <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
+                              <span className="text-sm font-bold">{date.getDate()}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Time Selection */}
+                    <div className={!bookingDate ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">2. Pick Time</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.values(timeSlots).flat().map(slot => (
+                          <button 
+                            key={slot}
+                            onClick={() => setBookingTime(slot)}
+                            className={`px-4 py-2 rounded-full text-[10px] font-bold border transition-all ${bookingTime === slot ? 'bg-harbour-500 border-harbour-500 text-white' : 'bg-white/5 border-white/10 text-white'}`}
+                          >
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Note Selection */}
+                    <div className={!bookingTime ? 'opacity-40 pointer-events-none grayscale transition-all' : 'transition-all'}>
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">3. Note to Mentor</h4>
+                      <textarea 
+                        placeholder="Tell your mentor about your goals..."
+                        value={bookingNote}
+                        onChange={e => setBookingNote(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-harbour-500 min-h-[100px]"
+                      />
+                    </div>
+
+                    <button 
+                      disabled={!bookingDate || !bookingTime}
+                      onClick={() => {
+                        setBookingSuccess({ type: 'trial', mentor: selectedMentor.name });
+                        setIsTrialCompleted(true);
+                      }}
+                      className="w-full py-5 bg-white text-black font-bold rounded-full disabled:opacity-50 shadow-xl"
+                    >
+                      Confirm Free Trial
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </BottomSheet>
       </div>
     </div>
   );
