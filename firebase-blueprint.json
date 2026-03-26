@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile for both students and mentors",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "mentor"] },
+        "photo": { "type": "string" },
+        "instrument": { "type": "string" },
+        "location": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Lesson session details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "mentorId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "type": { "type": "string", "enum": ["trial", "single", "package"] }
+      },
+      "required": ["studentId", "mentorId", "date", "time", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "title", "body", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/lessons/{lessonId}": {
+      "schema": "Lesson",
+      "description": "Lesson documents"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Notification documents"
+    }
+  }
+}

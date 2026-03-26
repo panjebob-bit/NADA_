@@ -1,39 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif-curvy: "Playfair Display", serif;
-  --font-serif-sturdy: "Libre Baskerville", serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+  --font-mono: "DM Mono", monospace;
 
-  --color-harbour-50: #f0f7f7;
-  --color-harbour-100: #d9eaea;
-  --color-harbour-200: #b3d5d5;
-  --color-harbour-300: #80baba;
-  --color-harbour-400: #4d9f9f;
-  --color-harbour-500: #1d4d4f;
-  --color-harbour-600: #1a4547;
-  --color-harbour-700: #163a3c;
-  --color-harbour-800: #123031;
-  --color-harbour-900: #0e2526;
-  --color-harbour-950: #071213;
+  --color-pine-500: #2A5040;
+  --color-pine-600: #1E3D2F;
+  --color-pine-700: #163028;
+  --color-pine-800: #112219;
+  --color-pine-900: #0F1E17;
+  --color-pine-950: #0A0F0D;
+  --color-pine-text: #1A2E24;
 
-  --color-walnut-50: #fdfaf9;
-  --color-walnut-100: #f7ede8;
-  --color-walnut-200: #ecd9d0;
-  --color-walnut-300: #dab8a9;
-  --color-walnut-400: #c18d76;
-  --color-walnut-500: #3d2b1f;
-  --color-walnut-600: #35251b;
-  --color-walnut-700: #2d1f17;
-  --color-walnut-800: #251a13;
-  --color-walnut-900: #1d140f;
-  --color-walnut-950: #0f0a07;
+  --color-teal-300: #2A9D6F;
+  --color-teal-400: #22B588;
+  --color-teal-500: #1D9E75;
+
+  --color-mint-50: #F0F7F4;
+  --color-mint-100: #EAF4EF;
+
+  --color-sage-50: #E8F0EC;
+  --color-sage-400: #7A9E8A;
+
+  --color-forest-400: #4A6B58;
+
+  --color-amber-400: #D4A843;
+  --color-amber-600: #C8901A;
+
+  --color-emerald-400: #2ECC8A;
+  --color-emerald-600: #1E9E6A;
+
+  /* Keep old colors for compatibility during transition if needed, but PDF says to map them */
+  --color-harbour-500: #1D9E75;
+  --color-walnut-500: #2A5040;
 }
 
 @layer base {
   body {
-    @apply font-sans text-walnut-950;
+    @apply font-sans text-pine-950;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
   }
 }
 

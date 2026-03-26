@@ -54,9 +54,40 @@ import {
   Check,
   HelpCircle,
   Info,
-  History
+  History,
+  CreditCard,
+  Bot,
+  Sparkles,
+  Zap,
+  Brain,
+  Lightbulb,
+  Target,
+  MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  signOut,
+  User as FirebaseUser,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  doc, 
+  updateDoc,
+  getDoc,
+  setDoc,
+  getDocFromServer
+} from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 // --- Types ---
 
@@ -138,6 +169,17 @@ interface Milestone {
   id: string;
   title: string;
   status: 'completed' | 'current' | 'upcoming';
+  description?: string;
+}
+
+interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: Date;
 }
 
 interface SessionLog {
@@ -154,7 +196,7 @@ interface SessionLog {
 interface Material {
   id: string;
   studentId: string;
-  type: 'Notes' | 'Guide';
+  type: 'Notes' | 'Guide' | 'PDF';
   title: string;
   lessonId?: string; // Linked lesson ID
   date: string;
@@ -211,20 +253,20 @@ const MOCK_STUDENTS: Student[] = [
     name: 'Sarah Jenkins', 
     email: 'sarah.j@example.com',
     instrument: 'Gambus', 
-    stage: 'Stage 2: Basic Rhythms', 
+    stage: 'Stage 2 — Developing', 
     lessonsRemaining: 4, 
     lastLesson: '2024-03-12', 
     package: 'Package 8', 
-    photo: 'https://picsum.photos/seed/sarah/200', 
+    photo: 'https://picsum.photos/seed/woman5/200', 
     progress: 45,
     totalLessons: 8,
     aboutMe: "I've always been fascinated by the sound of the Gambus. I want to learn how to play Zapin music properly.",
     privateNotes: "Learns best with visual examples. Tends to rush — slow down exercises help. Prefers morning lessons.",
     learningPath: [
-      { id: 'm1', title: 'Holding & Tuning', status: 'completed' },
-      { id: 'm2', title: 'Basic Plucking', status: 'completed' },
-      { id: 'm3', title: 'Simple Rhythms', status: 'current' },
-      { id: 'm4', title: 'First Song', status: 'upcoming' },
+      { id: 'm1', title: 'Stage 1 — Foundation', status: 'completed', description: 'Hold and position the Gambus correctly, Tune all strings by ear, Basic open string plucking, First chord shape, Simple Zapin strumming pattern' },
+      { id: 'm2', title: 'Stage 2 — Developing', status: 'current', description: 'Full Zapin rhythm pattern, Chord transitions, First traditional melody, Basic ornamentation' },
+      { id: 'm3', title: 'Stage 3 — Progressing', status: 'upcoming', description: 'Full song performance, Advanced chord shapes, Improvisation basics, Dynamic control' },
+      { id: 'm4', title: 'Stage 4 — Performance Ready', status: 'upcoming', description: 'Full repertoire of 3 songs, Stage performance technique, Cultural context and storytelling, Solo performance' },
     ]
   },
   { 
@@ -232,19 +274,19 @@ const MOCK_STUDENTS: Student[] = [
     name: 'Marcus Chen', 
     email: 'marcus.c@example.com',
     instrument: 'Erhu', 
-    stage: 'Stage 3: Vibrato', 
+    stage: 'Stage 3 — Progressing', 
     lessonsRemaining: 1, 
     lastLesson: '2024-03-14', 
     package: 'Single', 
-    photo: 'https://picsum.photos/seed/marcus/200', 
+    photo: 'https://picsum.photos/seed/man9/200', 
     progress: 75, 
     totalLessons: 1,
     aboutMe: "I played violin in school, but the Erhu has a much more expressive sound that I love.",
     learningPath: [
-      { id: 'm1', title: 'Bowing Basics', status: 'completed' },
-      { id: 'm2', title: 'D Major Scale', status: 'completed' },
-      { id: 'm3', title: 'Vibrato Technique', status: 'current' },
-      { id: 'm4', title: 'Traditional Pieces', status: 'upcoming' },
+      { id: 'm1', title: 'Stage 1 — Foundation', status: 'completed', description: 'Correct bow hold and posture, Open string tone production, D major scale, Basic bow control' },
+      { id: 'm2', title: 'Stage 2 — Developing', status: 'completed', description: 'First traditional melody, Vibrato introduction, Position shifting basics, Dynamic control' },
+      { id: 'm3', title: 'Stage 3 — Progressing', status: 'current', description: 'Advanced vibrato and slides, Full song performance, Ornamentation techniques, Expression and phrasing' },
+      { id: 'm4', title: 'Stage 4 — Performance Ready', status: 'upcoming', description: 'Full repertoire, Advanced techniques mastery, Stage presence, Solo performance' },
     ]
   },
   { 
@@ -252,19 +294,19 @@ const MOCK_STUDENTS: Student[] = [
     name: 'Elena Rodriguez', 
     email: 'elena.r@example.com',
     instrument: 'Sitar', 
-    stage: 'Stage 1: Introduction', 
+    stage: 'Stage 1 — Foundation', 
     lessonsRemaining: 12, 
     lastLesson: '2024-03-10', 
     package: 'Monthly', 
-    photo: 'https://picsum.photos/seed/elena/200', 
+    photo: 'https://picsum.photos/seed/woman6/200', 
     progress: 15, 
     totalLessons: 12,
     aboutMe: "I'm a world traveler and I want to learn the instruments of the cultures I visit.",
     learningPath: [
-      { id: 'm1', title: 'Sitting Posture', status: 'completed' },
-      { id: 'm2', title: 'Tuning the Sitar', status: 'current' },
-      { id: 'm3', title: 'Basic Raags', status: 'upcoming' },
-      { id: 'm4', title: 'Improvisation', status: 'upcoming' },
+      { id: 'm1', title: 'Stage 1 — Foundation', status: 'current', description: 'Correct sitting posture and hold, Right hand Mizrab technique, Basic Raga notes, Simple Alap' },
+      { id: 'm2', title: 'Stage 2 — Developing', status: 'upcoming', description: 'First full Raga, Gat pattern basics, Left hand slides and pulls, Rhythm coordination' },
+      { id: 'm3', title: 'Stage 3 — Progressing', status: 'upcoming', description: 'Advanced Raga development, Jhala technique, Improvisation within Raga, Speed and clarity' },
+      { id: 'm4', title: 'Stage 4 — Performance Ready', status: 'upcoming', description: 'Full Raga performance, Alap, Jor, Jhala mastery, Stage presence, Solo concert readiness' },
     ]
   },
   { 
@@ -276,7 +318,7 @@ const MOCK_STUDENTS: Student[] = [
     lessonsRemaining: 0, 
     lastLesson: '-', 
     package: 'Trial', 
-    photo: 'https://picsum.photos/seed/ahmad/200', 
+    photo: 'https://picsum.photos/seed/man10/200', 
     progress: 0, 
     totalLessons: 1,
     aboutMe: "Interested in traditional Malay music.",
@@ -291,7 +333,7 @@ const MOCK_STUDENTS: Student[] = [
     lessonsRemaining: 0, 
     lastLesson: '-', 
     package: 'Trial', 
-    photo: 'https://picsum.photos/seed/mei/200', 
+    photo: 'https://picsum.photos/seed/woman7/200', 
     progress: 0, 
     totalLessons: 1,
     aboutMe: "Love the sound of Guzheng.",
@@ -306,7 +348,7 @@ const MOCK_STUDENTS: Student[] = [
     lessonsRemaining: 0, 
     lastLesson: '-', 
     package: 'Trial', 
-    photo: 'https://picsum.photos/seed/karthik/200', 
+    photo: 'https://picsum.photos/seed/man11/200', 
     progress: 0, 
     totalLessons: 1,
     aboutMe: "Fascinated by Indian rhythms.",
@@ -316,17 +358,47 @@ const MOCK_STUDENTS: Student[] = [
 
 const MOCK_SESSION_LOGS: SessionLog[] = [
   {
-    id: 'log1',
+    id: 'log4',
     studentId: 's1',
     lessonNumber: 4,
     date: '2024-03-12',
     covered: 'Reviewed basic Zapin rhythm. Focused on the downbeat and plucking strength.',
     focus: 'Practice the transition between the first and second rhythm patterns. Keep the wrist relaxed.',
-    milestones: ['m1', 'm2'],
+    milestones: ['m3'],
     materials: ['mat1']
   },
   {
+    id: 'log3',
+    studentId: 's1',
+    lessonNumber: 3,
+    date: '2024-03-05',
+    covered: 'Introduction to syncopated rhythms. Worked on hand positioning.',
+    focus: 'Daily 15 mins of scale exercises.',
+    milestones: ['m2'],
+    materials: []
+  },
+  {
     id: 'log2',
+    studentId: 's1',
+    lessonNumber: 2,
+    date: '2024-02-26',
+    covered: 'Basic plucking techniques and tuning the Gambus.',
+    focus: 'Focus on the G and D strings.',
+    milestones: ['m1'],
+    materials: []
+  },
+  {
+    id: 'log1',
+    studentId: 's1',
+    lessonNumber: 1,
+    date: '2024-02-19',
+    covered: 'First lesson! Introduction to the instrument and posture.',
+    focus: 'Correct sitting posture.',
+    milestones: [],
+    materials: []
+  },
+  {
+    id: 'log_m2_1',
     studentId: 's2',
     lessonNumber: 1,
     date: '2024-03-14',
@@ -343,7 +415,7 @@ const MOCK_MATERIALS: Material[] = [
     studentId: 's1',
     type: 'Notes',
     title: 'Zapin Rhythm Basics',
-    lessonId: 'log1',
+    lessonId: 'log4',
     date: '2024-03-12',
     url: '#'
   },
@@ -363,7 +435,7 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     id: 't1',
     studentId: 's1',
     studentName: 'Sarah Jenkins',
-    studentPhoto: 'https://picsum.photos/seed/sarah/200',
+    studentPhoto: 'https://picsum.photos/seed/woman5/200',
     date: '2024-03-14',
     lessonType: 'Package',
     grossAmount: 612,
@@ -374,7 +446,7 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     id: 't2',
     studentId: 's2',
     studentName: 'Marcus Chen',
-    studentPhoto: 'https://picsum.photos/seed/marcus/200',
+    studentPhoto: 'https://picsum.photos/seed/man9/200',
     date: '2024-03-13',
     lessonType: 'Single',
     grossAmount: 120,
@@ -385,7 +457,7 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     id: 't3',
     studentId: 's3',
     studentName: 'Elena Rodriguez',
-    studentPhoto: 'https://picsum.photos/seed/elena/200',
+    studentPhoto: 'https://picsum.photos/seed/woman6/200',
     date: '2024-03-10',
     lessonType: 'Monthly',
     grossAmount: 350,
@@ -418,6 +490,8 @@ const MOCK_LESSONS: Lesson[] = [
   { id: 'l4', studentId: 's4', studentName: 'Ahmad Fauzi', instrument: 'Gambus', time: '10:00', date: '2024-03-22', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '2h 15m', studentNote: "Hi, I'm a complete beginner. Looking forward to learning the basics!" },
   { id: 'l5', studentId: 's5', studentName: 'Mei Ling', instrument: 'Guzheng', time: '15:00', date: '2024-03-23', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '5h 40m', studentNote: "I've played a bit before, but want to focus on traditional techniques." },
   { id: 'l6', studentId: 's6', studentName: 'Karthik Raja', instrument: 'Tabla', time: '18:30', date: '2024-03-24', lessonNumber: 1, type: 'Trial', status: 'pending', countdown: '12h 10m', studentNote: "Interested in the rhythmic patterns of the Tabla. Can we start with basic bols?" },
+  { id: 'l7', studentId: 's7', studentName: 'Siti Aminah', instrument: 'Oud', time: '11:00', date: '2024-03-25', lessonNumber: 1, type: 'Single', status: 'pending', studentNote: "I want to learn how to play some traditional Malay songs on the Oud." },
+  { id: 'l8', studentId: 's8', studentName: 'Wei Kang', instrument: 'Pipa', time: '14:30', date: '2024-03-26', lessonNumber: 1, type: 'Package', status: 'pending', studentNote: "Booking the 8-lesson package to get a solid foundation in Pipa." },
 ];
 
 const MOCK_MESSAGES = [
@@ -446,6 +520,93 @@ const MOCK_MESSAGES = [
     ]
   }
 ];
+
+const INSTRUMENT_STAGES: Record<string, { title: string; milestones: string[] }[]> = {
+  'Gambus': [
+    { title: 'Stage 1 — Foundation', milestones: ['Hold and position the Gambus correctly', 'Tune all strings by ear', 'Basic open string plucking', 'First chord shape', 'Simple Zapin strumming pattern'] },
+    { title: 'Stage 2 — Developing', milestones: ['Full Zapin rhythm pattern', 'Chord transitions', 'First traditional melody', 'Basic ornamentation'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Full song performance', 'Advanced chord shapes', 'Improvisation basics', 'Dynamic control'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full repertoire of 3 songs', 'Stage performance technique', 'Cultural context and storytelling', 'Solo performance'] }
+  ],
+  'Biola Melayu': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct bow hold and posture', 'Open string bowing', 'Basic scales', 'First Asli melody'] },
+    { title: 'Stage 2 — Developing', milestones: ['Ghazal rhythm bowing', 'Vibrato introduction', 'First full song', 'Intonation control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced bowing techniques', 'Ornamentation and slides', 'Full Ghazal performance', 'Improvisation'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full repertoire', 'Ensemble awareness', 'Stage presence', 'Solo performance'] }
+  ],
+  'Rebab': [
+    { title: 'Stage 1 — Foundation', milestones: ['Hold Rebab correctly', 'Bow technique basics', 'Open string tone production', 'First scale'] },
+    { title: 'Stage 2 — Developing', milestones: ['Mak Yong melody basics', 'Intonation development', 'First full piece', 'Dynamic control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced Mak Yong repertoire', 'Ornamentation', 'Extended techniques', 'Performance readiness'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full traditional repertoire', 'Cultural storytelling through music', 'Solo performance', 'Stage presence'] }
+  ],
+  'Tabla': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct hand and finger placement', 'Basic strokes — Na, Ta, Tin, Dha', 'Simple Teentaal pattern', 'Basic rhythm counting'] },
+    { title: 'Stage 2 — Developing', milestones: ['Full Teentaal at medium tempo', 'Keherwa Taal introduction', 'Composition basics', 'Solo phrases'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced Taals — Rupak, Jhaptal', 'Speed development', 'Layakari patterns', 'Improvisation'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full solo performance', 'Multiple Taal mastery', 'Call and response with melody', 'Stage performance'] }
+  ],
+  'Sitar': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct sitting posture and hold', 'Right hand Mizrab technique', 'Basic Raga notes', 'Simple Alap'] },
+    { title: 'Stage 2 — Developing', milestones: ['First full Raga', 'Gat pattern basics', 'Left hand slides and pulls', 'Rhythm coordination'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced Raga development', 'Jhala technique', 'Improvisation within Raga', 'Speed and clarity'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full Raga performance', 'Alap, Jor, Jhala mastery', 'Stage presence', 'Solo concert readiness'] }
+  ],
+  'Bansuri Flute': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct embouchure and breath', 'First 3 notes — Sa, Re, Ga', 'Basic breath control', 'Simple scale'] },
+    { title: 'Stage 2 — Developing', milestones: ['Full lower octave scale', 'First simple melody', 'Tongue technique', 'Breath stamina'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Upper octave development', 'Meend and Gamak ornaments', 'First full Raga', 'Dynamic control'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full Raga performance', 'Improvisation', 'Breath mastery', 'Solo performance'] }
+  ],
+  'Violin Carnatic': [
+    { title: 'Stage 1 — Foundation', milestones: ['Seated posture and bow hold', 'Open string bowing', 'Sa Re Ga Ma Pa scale', 'Basic intonation'] },
+    { title: 'Stage 2 — Developing', milestones: ['First Carnatic kriti', 'Gamaka ornaments introduction', 'Shruti accuracy', 'Bow control development'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced Gamakas', 'Full kriti performance', 'Improvisation basics', 'Raga recognition'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full concert repertoire', 'Advanced Raga improvisation', 'Stage performance', 'Solo concert readiness'] }
+  ],
+  'Erhu': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct bow hold and posture', 'Open string tone production', 'D major scale', 'Basic bow control'] },
+    { title: 'Stage 2 — Developing', milestones: ['First traditional melody', 'Vibrato introduction', 'Position shifting basics', 'Dynamic control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced vibrato and slides', 'Full song performance', 'Ornamentation techniques', 'Expression and phrasing'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full repertoire', 'Advanced techniques mastery', 'Stage presence', 'Solo performance'] }
+  ],
+  'Dizi': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct embouchure', 'Membrane attachment and tuning', 'First 5 notes', 'Basic breath control'] },
+    { title: 'Stage 2 — Developing', milestones: ['Full scale', 'First traditional melody', 'Tongue techniques — single and double', 'Breath stamina'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced ornamentation', 'Full song performance', 'Upper register development', 'Dynamic control'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full repertoire', 'Improvisation', 'Stage performance', 'Solo concert readiness'] }
+  ],
+  'Pipa': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct hold and nail technique', 'Basic right hand plucking', 'Open string exercises', 'First scale'] },
+    { title: 'Stage 2 — Developing', milestones: ['First traditional piece', 'Left hand techniques — slides and vibrato', 'Tremolo introduction', 'Dynamic control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced tremolo', 'Full classical piece', 'Rapid plucking technique', 'Expression and storytelling'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full concert repertoire', 'Advanced techniques mastery', 'Stage presence', 'Solo performance'] }
+  ],
+  'Guzheng': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct posture and hand position', 'Basic right hand plucking — thumb and index', 'Pentatonic scale', 'String dampening technique'] },
+    { title: 'Stage 2 — Developing', milestones: ['Left hand pressing techniques', 'First traditional melody', 'Glissando introduction', 'Dynamic control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced left hand ornaments', 'Full classical piece', 'Both hands coordination', 'Vibrato and tremolo'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full concert repertoire', 'Advanced techniques mastery', 'Stage presence', 'Solo performance'] }
+  ],
+  'Sape': [
+    { title: 'Stage 1 — Foundation', milestones: ['Hold and position the Sape correctly', 'Tuning by ear', 'Basic open string drone', 'First melody phrase'] },
+    { title: 'Stage 2 — Developing', milestones: ['Traditional Sape melody', 'Drone and melody coordination', 'Spiritual music context', 'First full piece'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced melodies', 'Improvisation within traditional framework', 'Extended playing techniques', 'Cultural storytelling'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full traditional repertoire', 'Cultural ceremony readiness', 'Stage performance', 'Solo concert readiness'] }
+  ],
+  'Tongkungon': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct hold and posture', 'Basic string plucking', 'Pentatonic scale', 'First simple pattern'] },
+    { title: 'Stage 2 — Developing', milestones: ['Gong imitation patterns', 'First traditional melody', 'Rhythm coordination', 'Dynamic control'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced patterns', 'Full traditional piece', 'Cultural context', 'Expression and feel'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full repertoire', 'Cultural ceremony readiness', 'Stage performance', 'Solo performance'] }
+  ],
+  'Turali': [
+    { title: 'Stage 1 — Foundation', milestones: ['Correct nose flute embouchure', 'First 3 notes', 'Basic breath control', 'Simple phrase'] },
+    { title: 'Stage 2 — Developing', milestones: ['Full pentatonic scale', 'First traditional melody', 'Breath stamina', 'Expressive playing'] },
+    { title: 'Stage 3 — Progressing', milestones: ['Advanced melodies', 'Ornamentation', 'Dynamic control', 'Cultural context'] },
+    { title: 'Stage 4 — Performance Ready', milestones: ['Full traditional repertoire', 'Cultural ceremony readiness', 'Solo performance', 'Stage presence'] }
+  ]
+};
 
 const MOCK_INSTRUMENTS: Instrument[] = [
   // Malay
@@ -532,16 +693,6 @@ const MOCK_INSTRUMENTS: Instrument[] = [
     photo: 'https://images.unsplash.com/photo-1605826832916-d00908649430?auto=format&fit=crop&q=80&w=400'
   },
   {
-    id: 'i10',
-    name: 'Dizi',
-    nativeName: '笛子',
-    type: 'Wind',
-    culture: 'Chinese',
-    story: 'A bamboo flute with a unique buzzing membrane. Famous for its bright, resonant timbre.',
-    mentorCount: 2,
-    photo: 'https://images.unsplash.com/photo-1520193343412-d5983d2a74d0?auto=format&fit=crop&q=80&w=400'
-  },
-  {
     id: 'i11',
     name: 'Pipa',
     nativeName: '琵琶',
@@ -599,7 +750,7 @@ const MOCK_MENTORS: MentorDetail[] = [
     id: 'm1',
     name: 'Cikgu Aris Ramli',
     tagline: 'Preserving the Soul of Zapin',
-    photo: 'https://picsum.photos/seed/aris/200',
+    photo: 'https://picsum.photos/seed/man1/200',
     rating: 4.9,
     reviewCount: 128,
     location: 'Bangsar, Kuala Lumpur',
@@ -626,17 +777,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Master of Arts (Music) - ASWARA', 'National Heritage Award 2022'],
     gallery: [
-      'https://picsum.photos/seed/loc1/400/300',
-      'https://picsum.photos/seed/loc2/400/300',
       'https://picsum.photos/seed/studio1/400/300',
-      'https://picsum.photos/seed/studio2/400/300'
+      'https://picsum.photos/seed/studio2/400/300',
+      'https://picsum.photos/seed/studio3/400/300',
+      'https://picsum.photos/seed/studio4/400/300'
     ]
   },
   {
     id: 'm2',
     name: 'Guru Rajesh',
     tagline: 'The Rhythmic Heartbeat of Tabla',
-    photo: 'https://picsum.photos/seed/rajesh/200',
+    photo: 'https://picsum.photos/seed/man2/200',
     rating: 4.95,
     reviewCount: 89,
     location: 'Brickfields, Kuala Lumpur',
@@ -663,17 +814,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Sangeet Visharad', 'Performed at Petronas Philharmonic Hall'],
     gallery: [
-      'https://picsum.photos/seed/raj1/400/300',
-      'https://picsum.photos/seed/raj2/400/300',
-      'https://picsum.photos/seed/rajstudio1/400/300',
-      'https://picsum.photos/seed/rajstudio2/400/300'
+      'https://picsum.photos/seed/tabla1/400/300',
+      'https://picsum.photos/seed/tabla2/400/300',
+      'https://picsum.photos/seed/tabla3/400/300',
+      'https://picsum.photos/seed/tabla4/400/300'
     ]
   },
   {
     id: 'm3',
     name: 'Master Wong',
     tagline: 'Soulful Strings of the Erhu',
-    photo: 'https://picsum.photos/seed/wong/200',
+    photo: 'https://picsum.photos/seed/man3/200',
     rating: 4.88,
     reviewCount: 156,
     location: 'Georgetown, Penang',
@@ -700,17 +851,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Central Conservatory of Music Graduate', 'Penang Arts Excellence Award'],
     gallery: [
-      'https://picsum.photos/seed/wong1/400/300',
-      'https://picsum.photos/seed/wong2/400/300',
-      'https://picsum.photos/seed/wongstudio1/400/300',
-      'https://picsum.photos/seed/wongstudio2/400/300'
+      'https://picsum.photos/seed/erhu1/400/300',
+      'https://picsum.photos/seed/erhu2/400/300',
+      'https://picsum.photos/seed/erhu3/400/300',
+      'https://picsum.photos/seed/erhu4/400/300'
     ]
   },
   {
     id: 'm4',
     name: 'Mathew Ngau',
     tagline: 'Living Legend of the Sape',
-    photo: 'https://picsum.photos/seed/mathew/200',
+    photo: 'https://picsum.photos/seed/man4/200',
     rating: 5.0,
     reviewCount: 210,
     location: 'Kuching, Sarawak',
@@ -737,17 +888,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['National Living Heritage (Warisan Kebangsaan)', 'UNESCO Recognition'],
     gallery: [
-      'https://picsum.photos/seed/mat1/400/300',
-      'https://picsum.photos/seed/mat2/400/300',
-      'https://picsum.photos/seed/matstudio1/400/300',
-      'https://picsum.photos/seed/matstudio2/400/300'
+      'https://picsum.photos/seed/sape1/400/300',
+      'https://picsum.photos/seed/sape2/400/300',
+      'https://picsum.photos/seed/sape3/400/300',
+      'https://picsum.photos/seed/sape4/400/300'
     ]
   },
   {
     id: 'm5',
     name: 'Cikgu Siti Aminah',
     tagline: 'Melodies of the Biola Melayu',
-    photo: 'https://picsum.photos/seed/siti/200',
+    photo: 'https://picsum.photos/seed/woman1/200',
     rating: 4.85,
     reviewCount: 64,
     location: 'Shah Alam, Selangor',
@@ -772,17 +923,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Diploma in Music - UiTM', 'Best Instrumental Performance (Ghazal Festival)'],
     gallery: [
-      'https://picsum.photos/seed/siti1/400/300',
-      'https://picsum.photos/seed/siti2/400/300',
-      'https://picsum.photos/seed/sitistudio1/400/300',
-      'https://picsum.photos/seed/sitistudio2/400/300'
+      'https://picsum.photos/seed/biola1/400/300',
+      'https://picsum.photos/seed/biola2/400/300',
+      'https://picsum.photos/seed/biola3/400/300',
+      'https://picsum.photos/seed/biola4/400/300'
     ]
   },
   {
     id: 'm6',
     name: 'Guru Meenakshi',
     tagline: 'The Divine Voice of Carnatic Violin',
-    photo: 'https://picsum.photos/seed/meena/200',
+    photo: 'https://picsum.photos/seed/woman2/200',
     rating: 4.92,
     reviewCount: 75,
     location: 'Petaling Jaya, Selangor',
@@ -806,17 +957,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['B.A. Music (Violin) - Madras University', 'A-Grade Artist (All India Radio)'],
     gallery: [
-      'https://picsum.photos/seed/meena1/400/300',
-      'https://picsum.photos/seed/meena2/400/300',
-      'https://picsum.photos/seed/meenastudio1/400/300',
-      'https://picsum.photos/seed/meenastudio2/400/300'
+      'https://picsum.photos/seed/carnatic1/400/300',
+      'https://picsum.photos/seed/carnatic2/400/300',
+      'https://picsum.photos/seed/carnatic3/400/300',
+      'https://picsum.photos/seed/carnatic4/400/300'
     ]
   },
   {
     id: 'm7',
     name: 'Pandit Ravi',
     tagline: 'Breath of the Bansuri',
-    photo: 'https://picsum.photos/seed/ravi/200',
+    photo: 'https://picsum.photos/seed/man5/200',
     rating: 4.98,
     reviewCount: 112,
     location: 'Kajang, Selangor',
@@ -840,17 +991,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Disciple of Hariprasad Chaurasia', 'International Flute Festival Performer'],
     gallery: [
-      'https://picsum.photos/seed/ravi1/400/300',
-      'https://picsum.photos/seed/ravi2/400/300',
-      'https://picsum.photos/seed/ravistudio1/400/300',
-      'https://picsum.photos/seed/ravistudio2/400/300'
+      'https://picsum.photos/seed/bansuri1/400/300',
+      'https://picsum.photos/seed/bansuri2/400/300',
+      'https://picsum.photos/seed/bansuri3/400/300',
+      'https://picsum.photos/seed/bansuri4/400/300'
     ]
   },
   {
     id: 'm8',
     name: 'Master Chen',
     tagline: 'Bright Echoes of the Dizi',
-    photo: 'https://picsum.photos/seed/chen/200',
+    photo: 'https://picsum.photos/seed/man6/200',
     rating: 4.87,
     reviewCount: 94,
     location: 'Cheras, Kuala Lumpur',
@@ -874,17 +1025,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Shanghai Conservatory of Music', 'Gold Medalist - National Chinese Music Competition'],
     gallery: [
-      'https://picsum.photos/seed/chen1/400/300',
-      'https://picsum.photos/seed/chen2/400/300',
-      'https://picsum.photos/seed/chenstudio1/400/300',
-      'https://picsum.photos/seed/chenstudio2/400/300'
+      'https://picsum.photos/seed/dizi1/400/300',
+      'https://picsum.photos/seed/dizi2/400/300',
+      'https://picsum.photos/seed/dizi3/400/300',
+      'https://picsum.photos/seed/dizi4/400/300'
     ]
   },
   {
     id: 'm9',
     name: 'Ms. Lin',
     tagline: 'Cascading Notes of the Guzheng',
-    photo: 'https://picsum.photos/seed/lin/200',
+    photo: 'https://picsum.photos/seed/woman3/200',
     rating: 4.94,
     reviewCount: 142,
     location: 'Puchong, Selangor',
@@ -908,17 +1059,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Master of Music - Beijing Academy', 'Featured Soloist - Asian Cultural Festival'],
     gallery: [
-      'https://picsum.photos/seed/lin1/400/300',
-      'https://picsum.photos/seed/lin2/400/300',
-      'https://picsum.photos/seed/linstudio1/400/300',
-      'https://picsum.photos/seed/linstudio2/400/300'
+      'https://picsum.photos/seed/guzheng1/400/300',
+      'https://picsum.photos/seed/guzheng2/400/300',
+      'https://picsum.photos/seed/guzheng3/400/300',
+      'https://picsum.photos/seed/guzheng4/400/300'
     ]
   },
   {
     id: 'm10',
     name: 'Uncle Jerry Kamit',
     tagline: 'Sarawak Sape Virtuoso',
-    photo: 'https://picsum.photos/seed/jerry/200',
+    photo: 'https://picsum.photos/seed/man7/200',
     rating: 4.99,
     reviewCount: 185,
     location: 'Kuching, Sarawak',
@@ -942,17 +1093,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Rainforest World Music Festival Regular', 'Sarawak State Arts Award'],
     gallery: [
-      'https://picsum.photos/seed/jerry1/400/300',
-      'https://picsum.photos/seed/jerry2/400/300',
-      'https://picsum.photos/seed/jerrystudio1/400/300',
-      'https://picsum.photos/seed/jerrystudio2/400/300'
+      'https://picsum.photos/seed/jerrysape1/400/300',
+      'https://picsum.photos/seed/jerrysape2/400/300',
+      'https://picsum.photos/seed/jerrysape3/400/300',
+      'https://picsum.photos/seed/jerrysape4/400/300'
     ]
   },
   {
     id: 'm11',
     name: 'Alena Murang',
     tagline: 'Voice of the Kelabit Highlands',
-    photo: 'https://picsum.photos/seed/alena/200',
+    photo: 'https://picsum.photos/seed/woman4/200',
     rating: 4.97,
     reviewCount: 120,
     location: 'Miri, Sarawak',
@@ -975,17 +1126,17 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Forbes 30 Under 30 Asia', 'Best Music Video - UK Music Video Awards'],
     gallery: [
-      'https://picsum.photos/seed/alena1/400/300',
-      'https://picsum.photos/seed/alena2/400/300',
-      'https://picsum.photos/seed/alenastudio1/400/300',
-      'https://picsum.photos/seed/alenastudio2/400/300'
+      'https://picsum.photos/seed/alenasape1/400/300',
+      'https://picsum.photos/seed/alenasape2/400/300',
+      'https://picsum.photos/seed/alenasape3/400/300',
+      'https://picsum.photos/seed/alenasape4/400/300'
     ]
   },
   {
     id: 'm12',
     name: 'Cikgu Roslan',
     tagline: 'Guardian of Mak Yong Traditions',
-    photo: 'https://picsum.photos/seed/roslan/200',
+    photo: 'https://picsum.photos/seed/man8/200',
     rating: 4.89,
     reviewCount: 52,
     location: 'Kota Bharu, Kelantan',
@@ -1009,10 +1160,10 @@ const MOCK_MENTORS: MentorDetail[] = [
     ],
     credentials: ['Mak Yong Master Teacher', 'Kelantan State Heritage Icon'],
     gallery: [
-      'https://picsum.photos/seed/roslan1/400/300',
-      'https://picsum.photos/seed/roslan2/400/300',
-      'https://picsum.photos/seed/roslanstudio1/400/300',
-      'https://picsum.photos/seed/roslanstudio2/400/300'
+      'https://picsum.photos/seed/rebab1/400/300',
+      'https://picsum.photos/seed/rebab2/400/300',
+      'https://picsum.photos/seed/rebab3/400/300',
+      'https://picsum.photos/seed/rebab4/400/300'
     ]
   },
   {
@@ -1343,15 +1494,273 @@ const BottomSheet = ({ isOpen, onClose, title, children, dark = true }: { isOpen
   </AnimatePresence>
 );
 
+const MOCK_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'n1',
+    userId: 'student_001',
+    type: 'lesson_confirmed',
+    title: 'Trial Confirmed',
+    body: 'Cikgu Aris confirmed your free trial on Sat 15 Mar at 3:00 PM',
+    read: false,
+    createdAt: new Date()
+  },
+  {
+    id: 'n2',
+    userId: 'student_001',
+    type: 'message',
+    title: 'New Message',
+    body: 'You have a new message from Cikgu Aris',
+    read: true,
+    createdAt: new Date(Date.now() - 3600000)
+  }
+];
+
 export default function App() {
   const [view, setView] = useState<View>('auth');
-  const [authView, setAuthView] = useState<AuthView>('splash');
   const [isAuth, setIsAuth] = useState(false);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [authView, setAuthView] = useState<AuthView>('splash');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // Firebase Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
+        setIsAuth(true);
+        // Check if user has a profile in Firestore
+        getDoc(doc(db, 'users', user.uid)).then((docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setIsStudent(userData.role === 'student');
+            setView('home');
+          } else {
+            // New user, need to register
+            setView('registration');
+          }
+        });
+      } else {
+        setCurrentUser(null);
+        setIsAuth(false);
+        setView('auth');
+      }
+    });
+
+    // Test connection
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    };
+    testConnection();
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    setIsAuthLoading(true);
+    setAuthError(null);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        setAuthError("This domain is not authorized. Please add it to Firebase Console.");
+      } else {
+        setAuthError("Failed to sign in with Google. Please try again.");
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAuthLoading(true);
+    setAuthError(null);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      switch (error.code) {
+        case 'auth/invalid-email':
+          setAuthError("The email address is not valid.");
+          break;
+        case 'auth/user-disabled':
+          setAuthError("This user account has been disabled.");
+          break;
+        case 'auth/user-not-found':
+          setAuthError("No user found with this email. Please register first.");
+          break;
+        case 'auth/wrong-password':
+          setAuthError("Incorrect password. Please try again.");
+          break;
+        case 'auth/invalid-credential':
+          setAuthError("Invalid email or password. Please check and try again.");
+          break;
+        case 'auth/too-many-requests':
+          setAuthError("Too many failed attempts. Please try again later.");
+          break;
+        default:
+          setAuthError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleEmailRegister = async (e: React.FormEvent<HTMLFormElement>, role: 'student' | 'mentor') => {
+    e.preventDefault();
+    setIsAuthLoading(true);
+    setAuthError(null);
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const phone = formData.get('phone') as string;
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        name,
+        email,
+        phone,
+        role,
+        photo: user.photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+        createdAt: new Date().toISOString()
+      });
+      
+      setIsStudent(role === 'student');
+      setView('home');
+    } catch (error: any) {
+      console.error("Registration Error:", error);
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setAuthError("This email is already registered. Try signing in instead.");
+          break;
+        case 'auth/invalid-email':
+          setAuthError("The email address is not valid.");
+          break;
+        case 'auth/operation-not-allowed':
+          setAuthError("Email/password accounts are not enabled. Contact support.");
+          break;
+        case 'auth/weak-password':
+          setAuthError("The password is too weak. Use at least 6 characters.");
+          break;
+        default:
+          setAuthError("Failed to create account. Please try again.");
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAuthLoading(true);
+    setAuthError(null);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setForgotPasswordSent(true);
+    } catch (error: any) {
+      console.error("Forgot Password Error:", error);
+      switch (error.code) {
+        case 'auth/invalid-email':
+          setAuthError("The email address is not valid.");
+          break;
+        case 'auth/user-not-found':
+          setAuthError("No user found with this email.");
+          break;
+        default:
+          setAuthError("Failed to send reset link. Please try again.");
+      }
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setIsAuth(false);
+      setIsStudent(false);
+      setView('auth');
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
+  };
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotificationSheet, setShowNotificationSheet] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Notifications Listener
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs: Notification[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date()
+      } as Notification));
+      setNotifications(notifs);
+    }, (error) => {
+      console.error("Firestore Error in notifications listener:", error);
+      if (error.message.includes("requires an index")) {
+        console.warn("Missing Firestore Index. Please create it using this link: https://console.firebase.google.com/v1/r/project/nada-301ef/firestore/indexes?create_composite=ClBwcm9qZWN0cy9uYWRhLTMwMWVmL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnVzZXJJZBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const triggerNotification = async (type: string, title: string, body: string) => {
+    if (!notificationsEnabled || !currentUser) return;
+    
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: currentUser.uid,
+        type,
+        title,
+        body,
+        read: false,
+        createdAt: new Date()
+      });
+    } catch (error) {
+      console.error("Error triggering notification:", error);
+    }
+  };
   const [userRole, setUserRole] = useState<'student' | 'mentor' | null>(null);
   const [splashIndex, setSplashIndex] = useState(0);
   const [isStudent, setIsStudent] = useState(false);
   const [profileProgress, setProfileProgress] = useState(45);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [homeTab, setHomeTab] = useState<'today' | 'pending'>('today');
   const [scheduleFilter, setScheduleFilter] = useState<'week' | 'month' | 'all'>('week');
   const [activeLessonAction, setActiveLessonAction] = useState<Lesson | null>(null);
@@ -1377,11 +1786,15 @@ export default function App() {
   const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [showBookingSheet, setShowBookingSheet] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<LessonPackage | null>(null);
+  const [showAIGenerateSheet, setShowAIGenerateSheet] = useState(false);
+  const [showAIBuddySheet, setShowAIBuddySheet] = useState(false);
+  const [aiBuddyMessages, setAiBuddyMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [isAiBuddyTyping, setIsAiBuddyTyping] = useState(false);
   const [bookingDate, setBookingDate] = useState<string | null>(null);
   const [bookingTime, setBookingTime] = useState<string | null>(null);
   const [bookingNote, setBookingNote] = useState('');
   const [bookingType, setBookingType] = useState<'trial' | 'single' | 'package' | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [bookingStep, setBookingStep] = useState<number>(1);
   const [bookingSuccess, setBookingSuccess] = useState<{type: 'trial' | 'single' | 'package', mentor: string} | null>(null);
   const [isWeeklyRecurring, setIsWeeklyRecurring] = useState(false);
@@ -1415,6 +1828,60 @@ export default function App() {
   const [selectedChat, setSelectedChat] = useState<any | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
 
+  // Log Session States (Moved to top level to fix Rules of Hooks)
+  const [sessionRating, setSessionRating] = useState(0);
+  const [studentMood, setStudentMood] = useState<'Engaged' | 'Distracted' | 'Tired' | null>(null);
+  const [covered, setCovered] = useState('');
+  const [nextFocus, setNextFocus] = useState('');
+  const [selectedMilestones, setSelectedMilestones] = useState<string[]>([]);
+  const [aiBrainDump, setAiBrainDump] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Student Detail View States (Moved to top level to fix Rules of Hooks)
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [showAddMilestoneSheet, setShowAddMilestoneSheet] = useState(false);
+  const [showAddMaterialSheet, setShowAddMaterialSheet] = useState(false);
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [newMaterialTitle, setNewMaterialTitle] = useState('');
+  const [newMaterialType, setNewMaterialType] = useState<'PDF' | 'Guide' | 'Notes'>('PDF');
+
+  // Book Trial View States
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [studentNote, setStudentNote] = useState('');
+  const [bookingStepTrial, setBookingStepTrial] = useState<'datetime' | 'confirm'>('datetime');
+
+  // Book Paid View States
+  const [paymentStep, setPaymentStep] = useState<'method' | 'processing' | 'success'>('method');
+
+  // Mentor Profile View States
+  const [expandedSection, setExpandedSection] = useState<'path' | 'packages' | 'schedule' | 'gallery' | 'reviews' | 'credentials' | null>(null);
+  const [showTrialRules, setShowTrialRules] = useState(false);
+
+  // Student Journey View States
+  const [journeyTab, setJourneyTab] = useState<'lessons' | 'progress'>('lessons');
+  const [selectedInstrumentJourney, setSelectedInstrumentJourney] = useState('Gambus');
+  const [expandedLesson, setExpandedLesson] = useState<number | null>(null);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+
+  // Auth View States
+  const [roleTab, setRoleTab] = useState<'student' | 'mentor'>('student');
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+
+  // Chat and Profile States
+  const [chatNewMessage, setChatNewMessage] = useState('');
+  const [studentBio, setStudentBio] = useState("Traditional music enthusiast learning the strings of Malaysia.");
+  const [isEditingStudentBio, setIsEditingStudentBio] = useState(false);
+  const [studentNotificationsEnabled, setStudentNotificationsEnabled] = useState(true);
+  const [showStudentPaymentHistory, setShowStudentPaymentHistory] = useState(false);
+  const [showStudentPaymentMethods, setShowStudentPaymentMethods] = useState(false);
+  const [studentPaymentMethods, setStudentPaymentMethods] = useState([
+    { id: 'pm1', type: 'Visa', last4: '4242', expiry: '12/26', isDefault: true },
+    { id: 'pm2', type: 'Mastercard', last4: '8888', expiry: '08/25', isDefault: false }
+  ]);
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [newCardData, setNewCardData] = useState({ number: '', expiry: '', cvv: '', name: '' });
+
   const currentViewIsDark = (isStudent ? (['home', 'mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view', 'messages'].includes(studentView)) : (view === 'home' || view === 'messages' || view === 'registration' || view === 'full-schedule'));
   const isDark = preferredTheme !== null ? preferredTheme === 'dark' : currentViewIsDark;
 
@@ -1438,7 +1905,7 @@ export default function App() {
   const StudentHomeView = ({ forcedDark }: { forcedDark?: boolean }) => {
     const dark = forcedDark ?? isDark;
     return (
-      <div className={`min-h-full px-5 pt-8 pb-32 relative overflow-hidden ${dark ? 'bg-black' : 'bg-white'}`}>
+      <div className={`min-h-full px-5 pt-8 relative overflow-hidden ${dark ? 'bg-black' : 'bg-white'}`}>
         {/* Atmospheric Background */}
         {dark && (
           <div className="absolute inset-0 pointer-events-none">
@@ -1454,6 +1921,15 @@ export default function App() {
               <p className={`text-[9px] font-mono uppercase tracking-[0.3em] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Heritage Instruments</p>
             </div>
             <div className="flex gap-2">
+              <button 
+                onClick={() => setShowNotificationSheet(true)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center relative transition-all ${dark ? 'bg-white/10 text-white' : 'bg-black/5 text-zinc-900'}`}
+              >
+                <Bell size={18} />
+                {notifications.some(n => !n.read) && (
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-harbour-500 rounded-full border-2 border-black" />
+                )}
+              </button>
               {!forcedDark && <ThemeToggle />}
             </div>
           </div>
@@ -1516,7 +1992,7 @@ export default function App() {
   const MentorListingView = () => {
     const dark = true;
     return (
-      <div className="px-5 pt-12 pb-24">
+      <div className="px-5 pt-12">
         <div className="flex items-center gap-4 mb-8">
           <button onClick={() => setStudentView('home')} className={`w-10 h-10 rounded-full flex items-center justify-center border ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/5 text-zinc-900'}`}>
             <ChevronLeft size={20} />
@@ -1557,21 +2033,11 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                <div className="text-right flex flex-col justify-between">
+                <div className="text-right flex flex-col justify-end">
                   <div>
                     <p className={`text-[9px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>From</p>
                     <p className={`text-xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>RM{mentor.pricePerLesson}</p>
                   </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedChat(mentor);
-                      setStudentView('messages');
-                    }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-black/5 border-black/5 text-zinc-900 hover:bg-black/10'}`}
-                  >
-                    <MessageSquare size={16} />
-                  </button>
                 </div>
               </div>
             </motion.div>
@@ -1582,10 +2048,6 @@ export default function App() {
   };
 
   const BookTrialView = () => {
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedTime, setSelectedTime] = useState<string | null>(null);
-    const [studentNote, setStudentNote] = useState('');
-    const [bookingStep, setBookingStep] = useState<'datetime' | 'confirm'>('datetime');
     const dark = true;
 
     if (!selectedMentor) return null;
@@ -1600,7 +2062,7 @@ export default function App() {
     ];
 
     return (
-      <div className={`min-h-full px-5 pt-12 pb-32 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+      <div className={`min-h-full px-5 pt-12 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
         <header className="flex items-center gap-4 mb-8">
           <button onClick={() => setStudentView('mentor-profile')} className={`w-10 h-10 rounded-full border flex items-center justify-center ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             <ChevronLeft size={20} />
@@ -1611,7 +2073,7 @@ export default function App() {
           </div>
         </header>
 
-        {bookingStep === 'datetime' ? (
+        {bookingStepTrial === 'datetime' ? (
           <div className="space-y-8">
             <section>
               <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-4 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Select Date</h2>
@@ -1664,7 +2126,7 @@ export default function App() {
 
             <button 
               disabled={!selectedDate || !selectedTime}
-              onClick={() => setBookingStep('confirm')}
+              onClick={() => setBookingStepTrial('confirm')}
               className={`w-full py-5 rounded-full font-bold transition-all mt-8 ${
                 selectedDate && selectedTime 
                   ? (dark ? 'bg-white text-black' : 'bg-zinc-900 text-white')
@@ -1697,7 +2159,7 @@ export default function App() {
     const dark = true;
     if (!selectedMentor) return null;
     return (
-      <div className={`min-h-full px-5 pt-12 pb-32 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+      <div className={`min-h-full px-5 pt-12 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
         <header className="flex items-center gap-4 mb-8">
           <button onClick={() => setStudentView('mentor-profile')} className={`w-10 h-10 rounded-full border flex items-center justify-center ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             <ChevronLeft size={20} />
@@ -1728,13 +2190,12 @@ export default function App() {
   };
 
   const BookPaidView = () => {
-    const [paymentStep, setPaymentStep] = useState<'method' | 'processing' | 'success'>('method');
     const dark = true;
 
     if (!selectedMentor) return null;
 
     return (
-      <div className={`min-h-full px-5 pt-12 pb-32 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+      <div className={`min-h-full px-5 pt-12 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
         <header className="flex items-center gap-4 mb-8">
           <button onClick={() => setStudentView('mentor-profile')} className={`w-10 h-10 rounded-full border flex items-center justify-center ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             <ChevronLeft size={20} />
@@ -1828,7 +2289,7 @@ export default function App() {
 
     return (
       <div className={`h-full flex flex-col transition-colors duration-500 ${currentViewIsDark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-24">
           <AnimatePresence mode="wait">
             {studentView === 'home' && (
               <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -1864,8 +2325,8 @@ export default function App() {
         </div>
 
         {/* Bottom Nav */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%]">
-          <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
+          <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
             {[
               { id: 'home', icon: HomeIcon, label: 'Home' },
               { id: 'journey', icon: Music2, label: 'Journey' },
@@ -1900,14 +2361,12 @@ export default function App() {
     );
   };
   const MentorProfileView = () => {
-    const [expandedSection, setExpandedSection] = useState<'path' | 'packages' | 'schedule' | 'gallery' | 'reviews' | 'credentials' | null>(null);
-    const [showTrialRules, setShowTrialRules] = useState(false);
     const dark = true;
 
     if (!selectedMentor) return null;
 
     return (
-      <div className={`${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'} min-h-full pb-32`}>
+      <div className={`${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'} min-h-full`}>
         <div className="relative h-64 overflow-hidden">
           <img src={selectedMentor.photo} className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
           <div className={`absolute inset-0 bg-gradient-to-t ${dark ? 'from-black' : 'from-white'} via-transparent to-transparent`} />
@@ -2124,64 +2583,54 @@ export default function App() {
   };
 
   const StudentJourneyView = ({ forcedDark }: { forcedDark?: boolean }) => {
-    const [journeyTab, setJourneyTab] = useState<'lessons' | 'progress'>('lessons');
     const dark = forcedDark ?? isDark;
-    const [selectedInstrument, setSelectedInstrument] = useState('Gamelan');
-    const [expandedLesson, setExpandedLesson] = useState<number | null>(null);
-    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     
-    // Simulated states for the flow
-    const lessonsRemaining = 2; // Trigger for low package banner
+    // For demo purposes, we'll use Sarah Jenkins as the current student
+    const currentStudent = MOCK_STUDENTS[0];
+    const mentor = MOCK_MENTORS[0]; // Cikgu Aris
 
     const instruments = [
-      { id: 'gamelan', name: 'Gamelan', icon: Music2 },
-      { id: 'gambus', name: 'Gambus', icon: Music },
-      { id: 'sape', name: 'Sape', icon: Guitar },
+      { id: 'gambus', name: 'Gambus', icon: Music2 },
+      { id: 'tabla', name: 'Tabla', icon: Music },
+      { id: 'erhu', name: 'Erhu', icon: Guitar },
+      { id: 'sitar', name: 'Sitar', icon: Music2 },
+      { id: 'oud', name: 'Oud', icon: Music2 },
+      { id: 'guzheng', name: 'Guzheng', icon: Music2 },
     ];
 
     const stats = {
-      Gamelan: { lessons: '12', hours: '18.5', level: '4', status: 'On Track' },
-      Gambus: { lessons: '4', hours: '6.0', level: '2', status: 'Ahead' },
-      Sape: { lessons: '0', hours: '0', level: '1', status: 'Not Started' },
-    }[selectedInstrument] || { lessons: '0', hours: '0', level: '1', status: 'N/A' };
+      status: 'On Track',
+      id: '#8821'
+    };
 
-    const pastLessons = [
-      { 
-        id: 4, 
-        date: '10 Mar 2026', 
-        duration: '1h', 
-        review: 'Excellent progress on the syncopated rhythms. Your striking technique is becoming much more consistent.',
-        milestones: ['Mastered Basic Striking', 'Rhythm Consistency'],
-        focus: 'Focus on the transition between the Pelog and Slendro scales.'
-      },
-      { 
-        id: 3, 
-        date: '03 Mar 2026', 
-        duration: '1h', 
-        review: 'Good session. We need to work more on the hand positioning for the larger gongs.',
-        milestones: ['Scale Recognition'],
-        focus: 'Practice the hand-damping technique for 15 mins daily.'
-      },
-      { id: 2, date: '24 Feb 2026', duration: '1h', review: 'Solid foundation building.', milestones: [], focus: 'Basic posture.' },
-      { id: 1, date: '17 Feb 2026', duration: '1h', review: 'Great first session!', milestones: ['First Lesson'], focus: 'Instrument care.' },
-    ];
+    // Filter logs for the current student and instrument
+    const studentLogs = MOCK_SESSION_LOGS.filter(log => log.studentId === currentStudent.id);
+    
+    // Map logs to a more detailed format for the UI
+    const pastLessons = studentLogs.map((log, index) => ({
+      id: log.lessonNumber,
+      date: new Date(log.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      review: log.covered,
+      focus: log.focus,
+      milestones: log.milestones.map(mId => currentStudent.learningPath?.find(m => m.id === mId)?.title || mId),
+      encouragement: index === 0 ? "Excellent progress on the syncopated rhythms. Your striking technique is becoming much more consistent." : "Solid progress today.",
+      isLatest: index === 0
+    })).sort((a, b) => b.id - a.id);
 
-    const roadmap = [
-      { id: 1, title: 'Foundations', status: 'completed', desc: 'Mastered basic posture and striking techniques.' },
-      { id: 2, title: 'Rhythmic Patterns', status: 'current', desc: 'Currently learning complex syncopated rhythms.' },
-      { id: 3, title: 'Ensemble Playing', status: 'locked', desc: 'Introduction to playing with other instruments.' },
-      { id: 4, title: 'Advanced Ornamentation', status: 'locked', desc: 'Learning the intricate decorative notes.' },
-    ];
+    const roadmap = selectedInstrumentJourney === currentStudent.instrument 
+      ? (currentStudent.learningPath || [])
+      : (INSTRUMENT_STAGES[selectedInstrumentJourney] || []).map((stage, i) => ({
+          id: `m${i+1}`,
+          title: stage.title,
+          status: 'upcoming' as const,
+          description: stage.milestones.join(', ')
+        }));
 
-    const materials = [
-      { id: 1, title: 'Gambus Finger Positioning Guide', type: 'PDF', category: 'Diagram', icon: FileText },
-      { id: 2, title: 'Traditional Scales Reference', type: 'Doc', category: 'Scale Sheet', icon: BookOpen },
-      { id: 3, title: 'Cultural History of Gamelan', type: 'PDF', category: 'Reading', icon: Music2 },
-    ];
+    const materials = MOCK_MATERIALS.filter(m => m.studentId === currentStudent.id);
 
     const practiceGuides = [
-      { id: 1, title: 'Week 3 Practice Plan', type: 'Doc', desc: '25 mins daily, focus on chord transitions', icon: ClipboardList },
-      { id: 2, title: 'Daily Warm-up Routine', type: 'PDF', desc: '10 mins basic striking', icon: Clock },
+      { id: 1, title: 'Week 3 Practice Plan', type: 'Doc', desc: '25 mins daily, focus on chord transitions', icon: ClipboardList, lesson: 4 },
+      { id: 2, title: 'Daily Warm-up Routine', type: 'PDF', desc: '10 mins basic striking', icon: Clock, lesson: 2 },
     ];
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2192,253 +2641,259 @@ export default function App() {
     });
     
     return (
-      <div className={`min-h-full px-5 pt-8 pb-32 transition-colors duration-500 ${dark ? 'bg-black text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
-        {/* Header */}
+      <div className="min-h-full px-5 pt-8 bg-[#F9F9F9] text-zinc-900">
+        {/* Header Area */}
         <div className="flex justify-between items-end mb-4">
           <div>
-            <h1 className={`text-2xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>My Journey</h1>
+            <h1 className="text-3xl font-serif text-zinc-900">My Journey</h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <p className={`text-[9px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
-                {stats.status}
+              <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500">
+                {stats.status} • {stats.id}
               </p>
             </div>
           </div>
-          <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${dark ? 'bg-white/5 text-white/40' : 'bg-black/5 text-zinc-400'}`}>
-            ID: #8821
-          </div>
+          <ThemeToggle />
         </div>
 
-        {/* Instrument Switcher */}
+        {/* Instrument Switcher Chips */}
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">
           {instruments.map((inst) => (
             <button
               key={inst.id}
-              onClick={() => setSelectedInstrument(inst.name)}
-              className={`flex-shrink-0 px-4 py-2.5 rounded-2xl border flex items-center gap-2 transition-all ${selectedInstrument === inst.name ? (dark ? 'bg-white border-white text-black shadow-lg shadow-white/5' : 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-black/10') : (dark ? 'bg-white/5 border-white/10 text-white/40' : 'bg-white border-zinc-100 text-zinc-400 shadow-sm')}`}
+              onClick={() => setSelectedInstrumentJourney(inst.name)}
+              className={`flex-shrink-0 px-5 py-2.5 rounded-full border flex items-center gap-2 transition-all ${selectedInstrumentJourney === inst.name ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-black/10' : 'bg-white border-zinc-200 text-zinc-400 shadow-sm'}`}
             >
               <inst.icon size={14} />
-              <span className="text-[10px] font-bold">{inst.name}</span>
+              <span className="text-[11px] font-bold">{inst.name}</span>
             </button>
           ))}
         </div>
 
-        {/* Tabs */}
-        <div className={`flex gap-1 mb-6 p-1 rounded-full border transition-colors ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
+        {/* Tab Toggle */}
+        <div className="flex gap-1 mb-8 p-1 rounded-full bg-black/5 border border-black/5">
           <button 
             onClick={() => setJourneyTab('lessons')}
-            className={`flex-1 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${journeyTab === 'lessons' ? (dark ? 'bg-white text-black shadow-md' : 'bg-zinc-900 text-white shadow-md') : (dark ? 'text-white/40' : 'text-zinc-400')}`}
+            className={`flex-1 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${journeyTab === 'lessons' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
           >
             Schedule
           </button>
           <button 
             onClick={() => setJourneyTab('progress')}
-            className={`flex-1 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${journeyTab === 'progress' ? (dark ? 'bg-white text-black shadow-md' : 'bg-zinc-900 text-white shadow-md') : (dark ? 'text-white/40' : 'text-zinc-400')}`}
+            className={`flex-1 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${journeyTab === 'progress' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400'}`}
           >
             Growth
           </button>
         </div>
 
         {journeyTab === 'lessons' ? (
-          <div className="space-y-12">
-            {/* Upcoming Lessons Section */}
-            <section className="space-y-6">
+          <div className="space-y-10 pb-20">
+            {/* Upcoming Session Card */}
+            <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
-                <h2 className={`text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Upcoming Session</h2>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${dark ? 'bg-harbour-500/20 text-harbour-400' : 'bg-harbour-100 text-harbour-600'}`}>Confirmed</span>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Upcoming Session</h2>
               </div>
 
-              {/* Confirmed Lesson Card */}
-              <div className={`border rounded-[2.5rem] p-6 transition-colors relative overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-xl shadow-black/5'}`}>
-                {/* Decorative Background Element */}
-                <div className={`absolute -right-20 -top-20 w-48 h-48 rounded-full blur-3xl opacity-10 ${dark ? 'bg-harbour-500' : 'bg-walnut-200'}`} />
-                
-                <div className="relative z-10">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex gap-4 items-center">
-                      <img src="https://picsum.photos/seed/ahmad/100" className="w-12 h-12 rounded-xl object-cover shadow-lg" referrerPolicy="no-referrer" />
-                      <div>
-                        <h3 className={`font-serif-sturdy text-base ${dark ? 'text-white' : 'text-zinc-900'}`}>Cikgu Ahmad</h3>
-                        <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{selectedInstrument} • Lesson #5</p>
-                      </div>
+              <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex gap-4 items-center">
+                    <img src={mentor.photo} className="w-12 h-12 rounded-xl object-cover shadow-md" referrerPolicy="no-referrer" />
+                    <div>
+                      <h3 className="font-serif text-lg text-zinc-900">{mentor.name}</h3>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{selectedInstrumentJourney} • Lesson #5</p>
                     </div>
-                    <button className={`p-2 rounded-full transition-colors ${dark ? 'hover:bg-white/10 text-white/20' : 'hover:bg-black/5 text-zinc-300'}`}><MoreVertical size={18} /></button>
                   </div>
+                  <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                    <Clock size={10} /> 2 Days Away
+                  </div>
+                </div>
 
-                  <div className="grid grid-cols-1 gap-3 mb-6">
-                    <div className={`flex items-center gap-3 p-4 rounded-2xl border transition-colors ${dark ? 'bg-white/5 border-white/5' : 'bg-zinc-50 border-zinc-100'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-harbour-400' : 'bg-white text-harbour-500 shadow-sm'}`}>
-                        <Calendar size={16} />
-                      </div>
-                      <div>
-                        <p className={`text-[7px] font-bold uppercase tracking-widest mb-0.5 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Date & Time</p>
-                        <p className={`text-xs font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>Sunday, 15 Mar 2026 • 14:00</p>
-                      </div>
-                    </div>
-                    
-                    <div className={`flex items-center gap-3 p-4 rounded-2xl border transition-colors ${dark ? 'bg-white/5 border-white/5' : 'bg-zinc-50 border-zinc-100'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-harbour-400' : 'bg-white text-harbour-500 shadow-sm'}`}>
-                        <MapPin size={16} />
-                      </div>
-                      <div className="flex-1">
-                        <p className={`text-[7px] font-bold uppercase tracking-widest mb-0.5 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Location</p>
-                        <p className={`text-xs font-bold leading-tight ${dark ? 'text-white' : 'text-zinc-900'}`}>No. 12, Jalan Sultan, Kuala Lumpur</p>
-                      </div>
-                    </div>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Date & Time</p>
+                    <p className="text-xs font-bold text-zinc-900">15 Mar • 14:00</p>
                   </div>
+                  <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Location</p>
+                    <p className="text-xs font-bold text-zinc-900 truncate">Bangsar Studio</p>
+                  </div>
+                </div>
 
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-harbour-500/10 text-harbour-400 text-[9px] font-bold uppercase tracking-widest border border-harbour-500/20">
-                      <Clock size={10} /> 2 Days Away
-                    </div>
-                    <div className={`text-[9px] font-bold uppercase tracking-widest ${dark ? 'text-white/20' : 'text-zinc-400'}`}>
-                      60 Mins
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => setShowRescheduleModal(true)}
-                      className={`flex-1 py-3.5 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${dark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-zinc-900 text-white hover:bg-black shadow-lg shadow-black/10'}`}
-                    >
-                      Reschedule
-                    </button>
-                    <button className={`flex-1 py-3.5 border rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-zinc-200 text-zinc-900 hover:bg-zinc-50'}`}>Cancel</button>
-                  </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowRescheduleModal(true)}
+                    className="flex-1 py-4 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full shadow-lg shadow-black/10 transition-transform active:scale-95"
+                  >
+                    Reschedule
+                  </button>
+                  <button className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95">
+                    Cancel
+                  </button>
                 </div>
               </div>
             </section>
 
             {/* Past Lessons Log */}
-            <section className="space-y-6">
+            <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
-                <h2 className={`text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Past Lessons Log</h2>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${dark ? 'bg-zinc-500/10 text-zinc-400' : 'bg-zinc-100 text-zinc-600'}`}>4 Lessons</span>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Past Lessons Log</h2>
+                <span className="bg-zinc-100 text-zinc-500 px-2.5 py-1 rounded-full text-[9px] font-bold">{pastLessons.length} Lessons</span>
               </div>
 
-              <div className="space-y-4">
-                {pastLessons.map((lesson) => (
-                  <div key={lesson.id} className={`border rounded-[2rem] transition-all overflow-hidden ${dark ? 'bg-white/5 border-white/5' : 'bg-white border-zinc-100 shadow-sm'}`}>
-                    <button 
-                      onClick={() => setExpandedLesson(expandedLesson === lesson.id ? null : lesson.id)}
-                      className="w-full p-6 flex justify-between items-center text-left"
-                    >
-                      <div className="flex gap-4 items-center">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-white/40' : 'bg-zinc-100 text-zinc-400'}`}>
-                          <Music2 size={18} />
-                        </div>
-                        <div>
-                          <h4 className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>Lesson #{lesson.id}</h4>
-                          <p className={`text-[10px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{lesson.date} • {lesson.duration}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="flex gap-0.5 mb-1">
-                            {[1, 2, 3, 4, 5].map(s => (
-                              <Star key={s} size={8} className="fill-amber-400 text-amber-400" />
-                            ))}
+              <div className="space-y-3">
+                {pastLessons.map((lesson) => {
+                  const isExpanded = expandedLesson === lesson.id || (lesson.isLatest && expandedLesson === null);
+                  return (
+                    <div key={lesson.id} className={`bg-white border border-zinc-100 rounded-[2rem] transition-all overflow-hidden ${isExpanded ? 'shadow-lg' : 'shadow-sm'}`}>
+                      <button 
+                        onClick={() => setExpandedLesson(expandedLesson === lesson.id ? -1 : lesson.id)}
+                        className="w-full p-6 flex justify-between items-center text-left"
+                      >
+                        <div className="flex gap-4 items-center">
+                          <div className="w-10 h-10 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-400">
+                            <Music2 size={18} />
                           </div>
-                          <p className="text-[8px] font-bold text-green-500 uppercase tracking-widest">Completed</p>
+                          <div>
+                            <h4 className="text-sm font-bold text-zinc-900">Lesson #{lesson.id}</h4>
+                            <p className="text-[10px] text-zinc-400">{lesson.date}</p>
+                          </div>
                         </div>
-                        <motion.div animate={{ rotate: expandedLesson === lesson.id ? 90 : 0 }}>
-                          <ChevronRight size={16} className={dark ? 'text-white/20' : 'text-zinc-300'} />
+                        <motion.div animate={{ rotate: isExpanded ? 90 : 0 }}>
+                          <ChevronRight size={18} className="text-zinc-300" />
                         </motion.div>
-                      </div>
-                    </button>
+                      </button>
 
-                    <AnimatePresence>
-                      {expandedLesson === lesson.id && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="border-t border-white/5"
-                        >
-                          <div className="p-6 space-y-6">
-                            <div>
-                              <p className={`text-[8px] font-bold uppercase tracking-widest mb-2 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Mentor's Review</p>
-                              <p className={`text-xs italic leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>"{lesson.review}"</p>
-                            </div>
-                            
-                            {lesson.milestones.length > 0 && (
-                              <div>
-                                <p className={`text-[8px] font-bold uppercase tracking-widest mb-3 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Milestones Reached</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {lesson.milestones.map(m => (
-                                    <span key={m} className={`px-3 py-1 rounded-full text-[9px] font-bold flex items-center gap-1.5 ${dark ? 'bg-emerald-500/10 text-emerald-500' : 'bg-emerald-50 text-emerald-600'}`}>
-                                      <CheckCircle2 size={10} /> {m}
-                                    </span>
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="border-t border-zinc-50"
+                          >
+                            <div className="p-6 pt-2 space-y-6">
+                              <div className="flex justify-between items-center">
+                                <div className="flex gap-0.5">
+                                  {[1, 2, 3, 4, 5].map(s => (
+                                    <Star key={s} size={10} className="fill-amber-400 text-amber-400" />
                                   ))}
                                 </div>
+                                <div className="bg-teal-50 text-teal-600 px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
+                                  <Check size={10} /> From Mentor
+                                </div>
                               </div>
-                            )}
 
-                            <div className={`p-4 rounded-2xl ${dark ? 'bg-harbour-500/10' : 'bg-walnut-50'}`}>
-                              <p className={`text-[8px] font-bold uppercase tracking-widest mb-2 ${dark ? 'text-harbour-400/60' : 'text-harbour-500/60'}`}>Practice Focus</p>
-                              <p className={`text-xs font-medium ${dark ? 'text-harbour-400' : 'text-walnut-700'}`}>{lesson.focus}</p>
+                              <div className="border-l-4 border-teal-500 pl-4 py-1 bg-teal-50/30 rounded-r-xl">
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-teal-600 mb-1">Practice Focus</p>
+                                <p className="text-xs font-medium text-zinc-800">{lesson.focus}</p>
+                              </div>
+
+                              <div>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Mentor's Note</p>
+                                <p className="text-xs italic leading-relaxed text-zinc-600">"{lesson.encouragement || lesson.review}"</p>
+                              </div>
+                              
+                              {lesson.milestones && lesson.milestones.length > 0 && (
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Milestones Reached</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {lesson.milestones.map(m => (
+                                      <span key={m} className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-bold flex items-center gap-1.5 border border-emerald-100">
+                                        <CheckCircle2 size={10} /> {m}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <button className="w-full py-4 rounded-full bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-black/5 active:scale-95 transition-transform">
+                                <Star size={12} className="fill-current" />
+                                Rate this Lesson
+                              </button>
                             </div>
-
-                            <button className={`w-full py-4 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-zinc-900 text-white shadow-lg shadow-black/10'}`}>
-                              <Star size={12} className="fill-current" />
-                              Rate this Lesson
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Learning Roadmap */}
-            <section className="space-y-4">
+          <div className="space-y-10 pb-20">
+            {/* Learning Path (Roadmap) */}
+            <section className="space-y-6">
               <div className="flex items-center justify-between px-2">
-                <h2 className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Learning Path</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Learning Path</h2>
+                <div className="bg-teal-50 text-teal-600 px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <Check size={10} /> Set by Mentor
+                </div>
               </div>
 
-              <div className="relative pl-8 space-y-6 pb-4">
-                <div className={`absolute left-[11px] top-2 bottom-2 w-0.5 ${dark ? 'bg-white/10' : 'bg-black/5'}`} />
-                {roadmap.map((stage, i) => (
-                  <div key={i} className="relative">
-                    <div className={`absolute -left-[28px] top-1 w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-colors ${dark ? 'border-black' : 'border-white'} ${stage.status === 'completed' ? 'bg-harbour-500' : stage.status === 'current' ? (dark ? 'bg-white' : 'bg-zinc-900') : (dark ? 'bg-white/10' : 'bg-zinc-200')}`}>
-                      {stage.status === 'completed' && <CheckCircle2 size={12} className="text-white" />}
-                      {stage.status === 'current' && <div className={`w-1.5 h-1.5 rounded-full ${dark ? 'bg-black' : 'bg-white'}`} />}
-                      {stage.status === 'locked' && <Lock size={8} className={dark ? 'text-white/40' : 'text-zinc-400'} />}
-                    </div>
-                    <div className={`p-5 rounded-3xl border transition-all ${stage.status === 'current' ? (dark ? 'bg-white/10 border-white/20 shadow-xl' : 'bg-white border-zinc-300 shadow-lg shadow-black/5') : (dark ? 'bg-white/5 border-white/5 opacity-60' : 'bg-white border-zinc-100 opacity-60')}`}>
-                      <div className="flex justify-between items-start mb-1">
-                        <h4 className={`font-bold text-sm ${dark ? 'text-white' : 'text-zinc-900'}`}>{stage.title}</h4>
+              <div className="relative pl-8 space-y-6">
+                <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-zinc-100" />
+                {roadmap.map((stage, i) => {
+                  const isCurrent = stage.status === 'current';
+                  const isCompleted = stage.status === 'completed';
+                  const isUpcoming = stage.status === 'upcoming';
+                  
+                  return (
+                    <div key={i} className={`relative transition-opacity duration-500 ${isUpcoming ? 'opacity-45' : 'opacity-100'}`}>
+                      <div className={`absolute -left-[28px] top-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center z-10 shadow-sm ${isCompleted ? 'bg-teal-500' : isCurrent ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
+                        {isCompleted && <Check size={12} className="text-white" />}
+                        {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        {isUpcoming && <Lock size={8} className="text-zinc-400" />}
                       </div>
-                      <p className={`text-[10px] leading-relaxed ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{stage.desc}</p>
+                      
+                      <div className={`p-6 rounded-[2rem] border transition-all ${isCurrent ? 'bg-white border-zinc-300 shadow-xl shadow-black/5 ring-1 ring-black/5' : 'bg-white border-zinc-100 shadow-sm'}`}>
+                        <h4 className="font-bold text-sm text-zinc-900 mb-1">{stage.title}</h4>
+                        <div className="space-y-2">
+                          {stage.description ? (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {stage.description.split(', ').map((milestone, idx) => (
+                                <span key={idx} className={`px-2 py-1 rounded-md text-[9px] font-medium flex items-center gap-1 ${isCompleted ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : isCurrent ? 'bg-zinc-100 text-zinc-600 border border-zinc-200' : 'bg-zinc-50 text-zinc-400 border border-zinc-100'}`}>
+                                  {isCompleted ? <Check size={8} /> : isCurrent ? <div className="w-1 h-1 rounded-full bg-zinc-400" /> : <Lock size={8} />}
+                                  {milestone}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] leading-relaxed text-zinc-500">
+                              {isCompleted ? 'Mastered basic posture and techniques.' : isCurrent ? 'Currently learning complex rhythms.' : 'Introduction to playing with other instruments.'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
-            {/* Materials Section */}
-            <section className="space-y-4">
+            {/* Learning Materials */}
+            <section className="space-y-6">
               <div className="flex items-center justify-between px-2">
-                <h2 className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Learning Materials</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Learning Materials</h2>
+                <div className="text-zinc-400 px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <ArrowUpRight size={10} /> From Mentor
+                </div>
               </div>
+              
               <div className="grid grid-cols-1 gap-3">
                 {materials.map(mat => (
-                  <div key={mat.id} className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${dark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/10 text-harbour-400' : 'bg-harbour-50 text-harbour-600'}`}>
-                      <mat.icon size={18} />
+                  <div key={mat.id} className="bg-white p-4 rounded-2xl border border-zinc-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${mat.type === 'PDF' ? 'bg-teal-50 text-teal-600' : 'bg-zinc-50 text-zinc-400'}`}>
+                      {mat.type === 'PDF' ? <FileText size={18} /> : <BookOpen size={18} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`text-[8px] font-mono uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>{mat.type}</span>
-                        <span className={`w-1 h-1 rounded-full ${dark ? 'bg-white/10' : 'bg-zinc-200'}`} />
-                        <span className={`text-[8px] font-mono uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>{mat.category}</span>
+                        <span className={`text-[8px] font-mono uppercase tracking-widest ${mat.type === 'PDF' ? 'text-teal-600' : 'text-zinc-400'}`}>{mat.type}</span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-200" />
+                        <span className="text-[8px] font-mono uppercase tracking-widest text-zinc-400">Lesson #{mat.lessonId?.replace('log', '')}</span>
                       </div>
-                      <h3 className={`text-xs font-bold truncate ${dark ? 'text-white' : 'text-zinc-900'}`}>{mat.title}</h3>
+                      <h3 className="text-xs font-bold truncate text-zinc-900">{mat.title}</h3>
                     </div>
-                    <button className={`p-2 rounded-lg ${dark ? 'text-white/20 hover:text-white hover:bg-white/5' : 'text-zinc-300 hover:text-zinc-900 hover:bg-zinc-50'}`}>
+                    <button className="p-2.5 rounded-full bg-zinc-50 text-zinc-400 hover:text-zinc-900 transition-colors">
                       <Download size={16} />
                     </button>
                   </div>
@@ -2447,25 +2902,27 @@ export default function App() {
             </section>
 
             {/* Practice Guides */}
-            <section className="space-y-4">
+            <section className="space-y-6">
               <div className="flex items-center justify-between px-2">
-                <h2 className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Practice Guides</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Practice Guides</h2>
               </div>
-              <div className="grid grid-cols-1 gap-3">
+              
+              <div className="grid grid-cols-1 gap-4">
                 {practiceGuides.map(guide => (
-                  <div key={guide.id} className={`p-5 rounded-3xl border transition-all ${dark ? 'bg-harbour-500/10 border-harbour-500/20' : 'bg-walnut-50 border-walnut-100'}`}>
+                  <div key={guide.id} className="bg-teal-50/50 border border-teal-100 rounded-[2rem] p-6 relative overflow-hidden">
+                    <div className="absolute top-4 right-6 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-widest text-teal-600 border border-teal-100">
+                      ✓ From Lesson #{guide.lesson}
+                    </div>
+                    
                     <div className="flex items-start gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-harbour-500/20 text-harbour-400' : 'bg-white text-walnut-600 shadow-sm'}`}>
-                        <guide.icon size={18} />
+                      <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-teal-600 shadow-sm">
+                        <guide.icon size={20} />
                       </div>
                       <div className="flex-1">
-                        <div className="flex justify-between items-start mb-1">
-                          <h3 className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{guide.title}</h3>
-                          <span className={`text-[8px] font-mono uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>{guide.type}</span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>{guide.desc}</p>
-                        <button className={`mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-harbour-400' : 'text-walnut-700'}`}>
-                          <Download size={12} /> Download Guide
+                        <h3 className="text-sm font-bold text-zinc-900 mb-1">{guide.title}</h3>
+                        <p className="text-xs leading-relaxed text-zinc-600 mb-4">{guide.desc}</p>
+                        <button className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-teal-600 hover:text-teal-700 transition-colors">
+                          <Download size={14} /> Download Guide
                         </button>
                       </div>
                     </div>
@@ -2479,15 +2936,15 @@ export default function App() {
         {/* Reschedule Modal */}
         <BottomSheet isOpen={showRescheduleModal} onClose={() => setShowRescheduleModal(false)}>
           <div className="px-6 pb-10">
-            <h3 className="text-2xl font-serif-sturdy mb-2">Reschedule Session</h3>
-            <p className="text-sm text-white/60 mb-8">Pick a new date and time for your session with Cikgu Ahmad.</p>
+            <h3 className="text-2xl font-serif mb-2">Reschedule Session</h3>
+            <p className="text-sm text-zinc-500 mb-8">Pick a new date and time for your session with {mentor.name}.</p>
             
             <div className="space-y-6">
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 {dates.map((date, i) => (
                   <button 
                     key={i}
-                    className={`flex-shrink-0 w-12 py-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${i === 2 ? 'bg-harbour-500 text-white' : 'bg-white/5 text-white/60'}`}
+                    className={`flex-shrink-0 w-12 py-4 rounded-2xl flex flex-col items-center gap-1 transition-all ${i === 2 ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-400'}`}
                   >
                     <span className="text-[8px] uppercase font-bold">{days[date.getDay()]}</span>
                     <span className="text-sm font-bold">{date.getDate()}</span>
@@ -2497,7 +2954,7 @@ export default function App() {
               
               <div className="grid grid-cols-3 gap-2">
                 {['10:00', '11:00', '14:00', '15:00', '16:00', '17:00'].map(time => (
-                  <button key={time} className={`py-3 rounded-xl border text-[10px] font-bold ${time === '14:00' ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/40'}`}>
+                  <button key={time} className={`py-3.5 rounded-xl border text-[11px] font-bold transition-all ${time === '14:00' ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white border-zinc-100 text-zinc-400'}`}>
                     {time}
                   </button>
                 ))}
@@ -2505,7 +2962,7 @@ export default function App() {
 
               <button 
                 onClick={() => setShowRescheduleModal(false)}
-                className="w-full py-5 bg-harbour-500 text-white font-bold rounded-full mt-4"
+                className="w-full py-5 bg-teal-500 text-white font-bold rounded-full mt-6 shadow-lg shadow-teal-500/20 active:scale-95 transition-transform"
               >
                 Confirm New Time
               </button>
@@ -2517,7 +2974,6 @@ export default function App() {
   };
 
   const ChatConversation = ({ recipient, onBack, dark = true }: { recipient: any, onBack: () => void, dark?: boolean }) => {
-    const [newMessage, setNewMessage] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -2527,15 +2983,15 @@ export default function App() {
     }, [chatMessages]);
 
     const handleSend = () => {
-      if (!newMessage.trim()) return;
+      if (!chatNewMessage.trim()) return;
       const msg = {
         id: Date.now(),
-        text: newMessage,
+        text: chatNewMessage,
         sender: 'me',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setChatMessages([...chatMessages, msg]);
-      setNewMessage('');
+      setChatNewMessage('');
 
       // Simulate reply
       setTimeout(() => {
@@ -2546,6 +3002,7 @@ export default function App() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setChatMessages(prev => [...prev, reply]);
+        triggerNotification('message', 'New Message', `New message from ${recipient.name}: "${reply.text}"`);
       }, 1000);
     };
 
@@ -2586,8 +3043,8 @@ export default function App() {
         <div className={`p-5 pb-10 border-t ${dark ? 'border-white/10' : 'border-zinc-100'}`}>
           <div className="relative">
             <input 
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              value={chatNewMessage}
+              onChange={(e) => setChatNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Type a message..."
               className={`w-full py-4 pl-6 pr-14 rounded-full text-xs focus:outline-none ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`}
@@ -2620,7 +3077,7 @@ export default function App() {
     }
 
     return (
-      <div className={`h-full flex flex-col pt-16 pb-20 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+      <div className={`h-full flex flex-col pt-16 ${dark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
         <div className="px-5 mb-6">
           <h1 className="text-3xl font-serif-sturdy mb-6">Mentor Messages</h1>
           <div className="relative">
@@ -2663,10 +3120,6 @@ export default function App() {
   const StudentProfileView = () => {
     // Use the first mock student as the "current user" for this demo
     const currentUser = MOCK_STUDENTS[0];
-    const [bio, setBio] = useState(currentUser.aboutMe || "Traditional music enthusiast learning the strings of Malaysia.");
-    const [isEditingBio, setIsEditingBio] = useState(false);
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [showPaymentHistory, setShowPaymentHistory] = useState(false);
 
     // Filter transactions for this student
     const studentTransactions = MOCK_TRANSACTIONS.filter(t => t.studentId === currentUser.id);
@@ -2676,7 +3129,7 @@ export default function App() {
     ];
 
     return (
-      <div className={`h-full overflow-y-auto pb-32 ${isDark ? 'bg-black' : 'bg-zinc-50'}`}>
+      <div className={`h-full overflow-y-auto ${isDark ? 'bg-black' : 'bg-zinc-50'}`}>
         {/* Profile Header */}
         <header className={`relative px-6 pt-16 pb-8 overflow-hidden ${isDark ? 'bg-zinc-900' : 'bg-zinc-900'} text-white`}>
           <div className="absolute top-0 right-0 w-96 h-96 bg-harbour-500/10 rounded-full -mr-48 -mt-48 blur-[100px]" />
@@ -2711,20 +3164,20 @@ export default function App() {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>Short Bio</p>
-                  <button onClick={() => setIsEditingBio(!isEditingBio)} className={`text-harbour-500 hover:text-harbour-400 transition-colors`}>
-                    {isEditingBio ? <Check size={16} /> : <Edit2 size={14} />}
+                  <button onClick={() => setIsEditingStudentBio(!isEditingStudentBio)} className={`text-harbour-500 hover:text-harbour-400 transition-colors`}>
+                    {isEditingStudentBio ? <Check size={16} /> : <Edit2 size={14} />}
                   </button>
                 </div>
-                {isEditingBio ? (
+                {isEditingStudentBio ? (
                   <textarea 
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
+                    value={studentBio}
+                    onChange={(e) => setStudentBio(e.target.value)}
                     className={`w-full bg-transparent text-sm leading-relaxed border-b border-harbour-500/50 focus:border-harbour-500 outline-none pb-2 ${isDark ? 'text-white' : 'text-zinc-900'}`}
                     autoFocus
                   />
                 ) : (
-                  <p className={`text-sm leading-relaxed ${isDark ? 'text-white/70' : 'text-zinc-600'}`} onClick={() => setIsEditingBio(true)}>
-                    {bio}
+                  <p className={`text-sm leading-relaxed ${isDark ? 'text-white/70' : 'text-zinc-600'}`} onClick={() => setIsEditingStudentBio(true)}>
+                    {studentBio}
                   </p>
                 )}
               </div>
@@ -2806,8 +3259,76 @@ export default function App() {
           <section className="space-y-4">
             <h2 className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Other</h2>
             <div className={`rounded-[2rem] overflow-hidden border ${isDark ? 'bg-zinc-900 border-white/5' : 'bg-white border-zinc-100 shadow-sm'}`}>
+              
+              {/* Payment Details Section */}
               <button 
-                onClick={() => setShowPaymentHistory(!showPaymentHistory)}
+                onClick={() => setShowStudentPaymentMethods(!showStudentPaymentMethods)}
+                className={`w-full p-4 flex items-center justify-between border-b transition-colors ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-zinc-50 hover:bg-zinc-50'}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 text-white/40' : 'bg-zinc-50 text-zinc-400'}`}>
+                    <CreditCard size={18} />
+                  </div>
+                  <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Payment Details</p>
+                </div>
+                <ChevronRight size={16} className={`text-zinc-400 transition-transform ${showStudentPaymentMethods ? 'rotate-90' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {showStudentPaymentMethods && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className={`overflow-hidden ${isDark ? 'bg-black/20' : 'bg-zinc-50'}`}
+                  >
+                    <div className="p-4 space-y-4">
+                      {studentPaymentMethods.map(pm => (
+                        <div key={pm.id} className={`flex justify-between items-center p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 text-white/40' : 'bg-zinc-100 text-zinc-500'}`}>
+                              <CreditCard size={18} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{pm.type} •••• {pm.last4}</p>
+                                {pm.isDefault && <span className="px-1.5 py-0.5 bg-harbour-500/10 text-harbour-400 text-[8px] font-bold rounded uppercase tracking-widest">Default</span>}
+                              </div>
+                              <p className={`text-[10px] ${isDark ? 'text-white/40' : 'text-zinc-400'}`}>Expires {pm.expiry}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!pm.isDefault && (
+                              <button 
+                                onClick={() => setStudentPaymentMethods(studentPaymentMethods.map(m => ({ ...m, isDefault: m.id === pm.id })))}
+                                className="text-[9px] font-bold text-harbour-500 hover:text-harbour-400 uppercase tracking-widest"
+                              >
+                                Set Default
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => setStudentPaymentMethods(studentPaymentMethods.filter(m => m.id !== pm.id))}
+                              className="p-2 text-zinc-400 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button 
+                        onClick={() => setShowAddCardModal(true)}
+                        className={`w-full p-4 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${isDark ? 'border-white/10 text-white/40 hover:border-harbour-500/50 hover:text-harbour-400' : 'border-zinc-200 text-zinc-400 hover:border-harbour-500/50 hover:text-harbour-500'}`}
+                      >
+                        <Plus size={16} /> Add New Card
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button 
+                onClick={() => setShowStudentPaymentHistory(!showStudentPaymentHistory)}
                 className={`w-full p-4 flex items-center justify-between border-b transition-colors ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-zinc-50 hover:bg-zinc-50'}`}
               >
                 <div className="flex items-center gap-4">
@@ -2816,11 +3337,11 @@ export default function App() {
                   </div>
                   <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Payment History</p>
                 </div>
-                <ChevronRight size={16} className={`text-zinc-400 transition-transform ${showPaymentHistory ? 'rotate-90' : ''}`} />
+                <ChevronRight size={16} className={`text-zinc-400 transition-transform ${showStudentPaymentHistory ? 'rotate-90' : ''}`} />
               </button>
               
               <AnimatePresence>
-                {showPaymentHistory && (
+                {showStudentPaymentHistory && (
                   <motion.div 
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -2864,12 +3385,114 @@ export default function App() {
           </section>
 
           <button 
-            onClick={() => { setIsAuth(false); setIsStudent(false); setView('registration'); }}
+            onClick={handleLogout}
             className={`w-full py-5 font-bold rounded-[2rem] flex items-center justify-center gap-2 mt-4 transition-colors ${isDark ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-red-50 text-red-600 border border-red-100'}`}
           >
             <LogOut size={18} /> Log Out
           </button>
         </div>
+
+        <AnimatePresence>
+          {showAddCardModal && (
+            <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowAddCardModal(false)}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                className={`relative w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden border ${isDark ? 'bg-zinc-900 border-white/10' : 'bg-white border-zinc-100 shadow-2xl'}`}
+              >
+                <div className="p-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <div>
+                      <h3 className={`text-xl font-serif-sturdy ${isDark ? 'text-white' : 'text-zinc-900'}`}>Add New Card</h3>
+                      <p className={`text-[10px] uppercase tracking-widest font-bold mt-1 ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>Secure Payment Entry</p>
+                    </div>
+                    <button onClick={() => setShowAddCardModal(false)} className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-white/5 text-white/40' : 'bg-zinc-100 text-zinc-400'}`}>
+                      <XCircle size={20} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>Cardholder Name</label>
+                      <input 
+                        type="text"
+                        placeholder="John Doe"
+                        value={newCardData.name}
+                        onChange={(e) => setNewCardData({ ...newCardData, name: e.target.value })}
+                        className={`w-full p-4 rounded-2xl border text-sm font-bold transition-all outline-none ${isDark ? 'bg-white/5 border-white/10 text-white focus:border-harbour-500/50' : 'bg-zinc-50 border-zinc-100 text-zinc-900 focus:border-harbour-500/50'}`}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>Card Number</label>
+                      <div className="relative">
+                        <input 
+                          type="text"
+                          placeholder="•••• •••• •••• ••••"
+                          value={newCardData.number}
+                          onChange={(e) => setNewCardData({ ...newCardData, number: e.target.value })}
+                          className={`w-full p-4 pl-12 rounded-2xl border text-sm font-bold transition-all outline-none ${isDark ? 'bg-white/5 border-white/10 text-white focus:border-harbour-500/50' : 'bg-zinc-50 border-zinc-100 text-zinc-900 focus:border-harbour-500/50'}`}
+                        />
+                        <CreditCard size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>Expiry Date</label>
+                        <input 
+                          type="text"
+                          placeholder="MM/YY"
+                          value={newCardData.expiry}
+                          onChange={(e) => setNewCardData({ ...newCardData, expiry: e.target.value })}
+                          className={`w-full p-4 rounded-2xl border text-sm font-bold transition-all outline-none ${isDark ? 'bg-white/5 border-white/10 text-white focus:border-harbour-500/50' : 'bg-zinc-50 border-zinc-100 text-zinc-900 focus:border-harbour-500/50'}`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? 'text-white/20' : 'text-zinc-400'}`}>CVV</label>
+                        <input 
+                          type="text"
+                          placeholder="•••"
+                          value={newCardData.cvv}
+                          onChange={(e) => setNewCardData({ ...newCardData, cvv: e.target.value })}
+                          className={`w-full p-4 rounded-2xl border text-sm font-bold transition-all outline-none ${isDark ? 'bg-white/5 border-white/10 text-white focus:border-harbour-500/50' : 'bg-zinc-50 border-zinc-100 text-zinc-900 focus:border-harbour-500/50'}`}
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        if (newCardData.number && newCardData.expiry) {
+                          const last4 = newCardData.number.slice(-4) || '0000';
+                          setStudentPaymentMethods([...studentPaymentMethods, {
+                            id: `pm${Date.now()}`,
+                            type: 'Visa', // Simplified for demo
+                            last4,
+                            expiry: newCardData.expiry,
+                            isDefault: studentPaymentMethods.length === 0
+                          }]);
+                          setShowAddCardModal(false);
+                          setNewCardData({ number: '', expiry: '', cvv: '', name: '' });
+                        }
+                      }}
+                      className="w-full py-4 bg-harbour-500 text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-harbour-500/20 hover:bg-harbour-400 transition-all mt-4"
+                    >
+                      Save Card Details
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };
@@ -2879,7 +3502,7 @@ export default function App() {
       {
         title: "Discover Malaysia's Musical Roots",
         image: "https://picsum.photos/seed/sape/800/1200",
-        desc: "Explore the rich heritage of traditional instruments from Sape to Gamelan."
+        desc: "Explore the rich heritage of traditional instruments from Tabla to Erhu."
       },
       {
         title: "Learn From Real Masters",
@@ -2964,9 +3587,25 @@ export default function App() {
       </div>
     );
 
+    const AuthError = ({ message }: { message: string | null }) => (
+      <AnimatePresence>
+        {message && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 mb-6"
+          >
+            <AlertCircle className="text-red-500 shrink-0" size={18} />
+            <p className="text-xs font-medium text-red-500 leading-relaxed">{message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+
     const RoleSelectionView = () => (
       <div className={`min-h-screen p-8 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-zinc-50 text-zinc-900'}`}>
-        <button onClick={() => setAuthView('splash')} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
+        <button onClick={() => { setAuthView('splash'); setAuthError(null); }} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
           <ChevronLeft size={20} />
         </button>
 
@@ -2977,7 +3616,7 @@ export default function App() {
 
         <div className="space-y-4 flex-1">
           <button 
-            onClick={() => { setUserRole('student'); setAuthView('student-registration'); }}
+            onClick={() => { setUserRole('student'); setAuthView('student-registration'); setAuthError(null); }}
             className={`w-full p-8 rounded-[2.5rem] border-2 text-left transition-all group ${isDark ? 'bg-zinc-900 border-white/5 hover:border-harbour-500' : 'bg-white border-zinc-100 hover:border-harbour-500 shadow-sm'}`}
           >
             <div className="w-14 h-14 bg-harbour-100 text-harbour-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -2988,7 +3627,7 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => { setUserRole('mentor'); setAuthView('mentor-registration'); }}
+            onClick={() => { setUserRole('mentor'); setAuthView('mentor-registration'); setAuthError(null); }}
             className={`w-full p-8 rounded-[2.5rem] border-2 text-left transition-all group ${isDark ? 'bg-zinc-900 border-white/5 hover:border-walnut-500' : 'bg-white border-zinc-100 hover:border-walnut-500 shadow-sm'}`}
           >
             <div className="w-14 h-14 bg-walnut-100 text-walnut-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -3003,7 +3642,7 @@ export default function App() {
 
     const RegistrationView = ({ role }: { role: 'student' | 'mentor' }) => (
       <div className={`min-h-screen p-8 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-zinc-50 text-zinc-900'}`}>
-        <button onClick={() => setAuthView('role-selection')} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
+        <button onClick={() => { setAuthView('role-selection'); setAuthError(null); }} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
           <ChevronLeft size={20} />
         </button>
 
@@ -3012,36 +3651,39 @@ export default function App() {
           <p className="text-zinc-500 text-sm">Join the Maestro community today.</p>
         </div>
 
-        <form className="space-y-5" onSubmit={(e) => { 
-          e.preventDefault(); 
-          setIsAuth(true); 
-          if (role === 'student') {
-            setIsStudent(true);
-            setStudentView('home');
-          } else {
-            setIsStudent(false);
-            setView('home');
-          }
-        }}>
+        <AuthError message={authError} />
+
+        <form className="space-y-5" onSubmit={(e) => handleEmailRegister(e, role)}>
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Full Name</label>
-            <input type="text" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="Julian Vane" required />
+            <input name="name" type="text" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="Julian Vane" required />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Email Address</label>
-            <input type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
+            <input name="email" type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Password</label>
-            <input type="password" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="••••••••" required />
+            <input name="password" type="password" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="••••••••" required />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Phone Number</label>
-            <input type="tel" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="+60 12 345 6789" required />
+            <input name="phone" type="tel" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="+60 12 345 6789" required />
           </div>
 
-          <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-transform ${role === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
-            {role === 'student' ? 'Create Account' : 'Register'}
+          <button 
+            type="submit" 
+            disabled={isAuthLoading}
+            className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-all flex items-center justify-center gap-2 ${role === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'} ${isAuthLoading ? 'opacity-70 scale-[0.98]' : 'hover:scale-[1.02]'}`}
+          >
+            {isAuthLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              role === 'student' ? 'Create Account' : 'Register'
+            )}
           </button>
 
           <div className="relative py-4">
@@ -3055,6 +3697,7 @@ export default function App() {
 
           <button 
             type="button"
+            onClick={handleGoogleLogin}
             className={`w-full border font-bold py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900 shadow-sm'}`}
           >
             <img src="https://www.google.com/favicon.ico" className="w-5 h-5" />
@@ -3065,10 +3708,9 @@ export default function App() {
     );
 
     const SignInView = () => {
-      const [roleTab, setRoleTab] = useState<'student' | 'mentor'>('student');
       return (
         <div className={`min-h-screen p-8 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-zinc-50 text-zinc-900'}`}>
-          <button onClick={() => setAuthView('splash')} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
+          <button onClick={() => { setAuthView('splash'); setAuthError(null); }} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
             <ChevronLeft size={20} />
           </button>
 
@@ -3076,6 +3718,8 @@ export default function App() {
             <h2 className="text-3xl font-serif-sturdy mb-2">Welcome Back</h2>
             <p className="text-zinc-500 text-sm">Sign in to continue your journey.</p>
           </div>
+
+          <AuthError message={authError} />
 
           {/* Role Tabs */}
           <div className={`flex p-1 rounded-2xl mb-8 ${isDark ? 'bg-white/5' : 'bg-zinc-200/50'}`}>
@@ -3093,24 +3737,14 @@ export default function App() {
             </button>
           </div>
 
-          <form className="space-y-5" onSubmit={(e) => { 
-            e.preventDefault(); 
-            setIsAuth(true); 
-            if (roleTab === 'student') {
-              setIsStudent(true);
-              setStudentView('home');
-            } else {
-              setIsStudent(false);
-              setView('home');
-            }
-          }}>
+          <form className="space-y-5" onSubmit={handleEmailLogin}>
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Email Address</label>
-              <input type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
+              <input name="email" type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Password</label>
-              <input type="password" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="••••••••" required />
+              <input name="password" type="password" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="••••••••" required />
             </div>
 
             <div className="flex justify-end">
@@ -3123,8 +3757,19 @@ export default function App() {
               </button>
             </div>
 
-            <button className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-transform ${roleTab === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'}`}>
-              Sign In
+            <button 
+              type="submit" 
+              disabled={isAuthLoading}
+              className={`w-full font-bold py-5 rounded-[2rem] mt-4 shadow-xl transition-all flex items-center justify-center gap-2 ${roleTab === 'student' ? 'bg-harbour-500 text-white' : 'bg-zinc-900 text-white'} ${isAuthLoading ? 'opacity-70 scale-[0.98]' : 'hover:scale-[1.02]'}`}
+            >
+              {isAuthLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </button>
 
             <div className="relative py-4">
@@ -3138,6 +3783,7 @@ export default function App() {
 
             <button 
               type="button"
+              onClick={handleGoogleLogin}
               className={`w-full border font-bold py-5 rounded-[2rem] flex items-center justify-center gap-3 transition-all ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900 shadow-sm'}`}
             >
               <img src="https://www.google.com/favicon.ico" className="w-5 h-5" />
@@ -3149,7 +3795,6 @@ export default function App() {
     };
 
     const ForgotPasswordView = () => {
-      const [sent, setSent] = useState(false);
       return (
         <div className={`min-h-screen p-8 flex flex-col ${isDark ? 'bg-black text-white' : 'bg-zinc-50 text-zinc-900'}`}>
           <button onClick={() => setAuthView('sign-in')} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-12">
@@ -3161,14 +3806,26 @@ export default function App() {
             <p className="text-zinc-500 text-sm">Enter your email to receive a reset link.</p>
           </div>
 
-          {!sent ? (
-            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
+          {!forgotPasswordSent ? (
+            <form className="space-y-6" onSubmit={handleForgotPassword}>
+              <AuthError />
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Email Address</label>
-                <input type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
+                <input name="email" type="email" className={`w-full border rounded-2xl px-6 py-4 focus:outline-none ${isDark ? 'bg-white/5 border-white/10 focus:border-harbour-500' : 'bg-white border-zinc-200 focus:border-harbour-500'}`} placeholder="julian@example.com" required />
               </div>
-              <button className="w-full bg-zinc-900 text-white font-bold py-5 rounded-[2rem] shadow-xl transition-transform">
-                Send Reset Link
+              <button 
+                type="submit"
+                disabled={isAuthLoading}
+                className={`w-full bg-zinc-900 text-white font-bold py-5 rounded-[2rem] shadow-xl transition-all flex items-center justify-center gap-2 ${isAuthLoading ? 'opacity-70 scale-[0.98]' : 'hover:scale-[1.02]'}`}
+              >
+                {isAuthLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reset Link'
+                )}
               </button>
             </form>
           ) : (
@@ -3244,7 +3901,7 @@ export default function App() {
   };
 
   const HomeView = () => (
-    <div className="px-5 pt-12 pb-24">
+    <div className="px-5 pt-12">
       {/* Header - More Compact */}
       <div className="flex justify-between items-center mb-4">
         <div>
@@ -3253,8 +3910,14 @@ export default function App() {
         </div>
         <div className="flex gap-2">
           <ThemeToggle />
-          <button className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-zinc-900'}`}>
+          <button 
+            onClick={() => setShowNotificationSheet(true)}
+            className={`w-8 h-8 rounded-full flex items-center justify-center relative ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-zinc-900'}`}
+          >
             <Bell size={16} />
+            {notifications.some(n => !n.read) && (
+              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-harbour-500 rounded-full border border-black" />
+            )}
           </button>
           <img src="https://picsum.photos/seed/mentor/100" className={`w-8 h-8 rounded-full object-cover border ${isDark ? 'border-white/20' : 'border-black/10'}`} referrerPolicy="no-referrer" />
         </div>
@@ -3279,55 +3942,7 @@ export default function App() {
         </motion.div>
       )}
 
-      {/* Quick Stats - New */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
-          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Earnings</p>
-          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>$1,240</p>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-1 h-1 rounded-full bg-emerald-500" />
-            <span className="text-[7px] text-emerald-500 font-bold">+12%</span>
-          </div>
-        </div>
-        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
-          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Students</p>
-          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>24</p>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-1 h-1 rounded-full bg-blue-500" />
-            <span className="text-[7px] text-blue-500 font-bold">Active</span>
-          </div>
-        </div>
-        <div className={`p-3 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-zinc-50 border-zinc-200'}`}>
-          <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Hours</p>
-          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>32.5</p>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-1 h-1 rounded-full bg-amber-500" />
-            <span className="text-[7px] text-amber-500 font-bold">This month</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Quick Insights - New */}
-      <div className="flex gap-3 mb-6 overflow-x-auto pb-2 no-scrollbar">
-        <div className={`flex-shrink-0 w-48 p-3 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
-            <TrendingUp size={14} />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>Peak Performance</p>
-            <p className={`text-[9px] mt-0.5 ${isDark ? 'text-white/60' : 'text-indigo-600/80'}`}>Your students are most active on Tuesdays at 4 PM.</p>
-          </div>
-        </div>
-        <div className={`flex-shrink-0 w-48 p-3 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
-            <Users size={14} />
-          </div>
-          <div>
-            <p className={`text-[10px] font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Growth Opportunity</p>
-            <p className={`text-[9px] mt-0.5 ${isDark ? 'text-white/60' : 'text-emerald-600/80'}`}>3 trial students are ready for their first package.</p>
-          </div>
-        </div>
-      </div>
 
       {/* Tabs Toggle */}
       <div className={`flex gap-1 mb-6 p-1 rounded-full ${isDark ? 'bg-white/5' : 'bg-zinc-100'}`}>
@@ -3370,11 +3985,7 @@ export default function App() {
                           referrerPolicy="no-referrer"
                           alt={request.studentName}
                         />
-                        {request.type === 'Trial' && (
-                          <div className="absolute -top-1 -right-1 bg-amber-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[#0A0A0A]">
-                            FREE
-                          </div>
-                        )}
+
                       </div>
                       
                       <div className="min-w-0">
@@ -3422,18 +4033,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Other Packages */}
-                  <div className="mb-4">
-                    <p className={`text-[8px] font-mono uppercase tracking-widest mb-2 ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>Offer Other Packages</p>
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                      {MOCK_MENTORS[0].packages.filter(p => p.id !== 'p0').map(pkg => (
-                        <button key={pkg.id} className={`flex-shrink-0 px-3 py-2 rounded-xl border text-[9px] font-bold transition-all ${isDark ? 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'}`}>
-                          {pkg.name} (RM{pkg.price})
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="flex gap-2">
                     <button 
                       onClick={() => {
@@ -3447,10 +4046,20 @@ export default function App() {
                     >
                       <MessageSquare size={16} />
                     </button>
-                    <button className="flex-1 bg-harbour-600 text-white text-[10px] font-bold py-3 rounded-full hover:bg-harbour-500 transition-colors shadow-lg shadow-harbour-600/20">
+                    <button 
+                      onClick={() => {
+                        triggerNotification('lesson_confirmed', 'Trial Confirmed', `${mentorProfile.name} confirmed your free trial on ${new Date(request.date).toLocaleDateString()} at ${request.time}`);
+                      }}
+                      className="flex-1 bg-harbour-600 text-white text-[10px] font-bold py-3 rounded-full hover:bg-harbour-500 transition-colors shadow-lg shadow-harbour-600/20"
+                    >
                       Accept Request
                     </button>
-                    <button className={`flex-1 border text-[10px] font-bold py-3 rounded-full transition-colors ${isDark ? 'border-white/10 text-white hover:bg-white/5' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}>
+                    <button 
+                      onClick={() => {
+                        triggerNotification('lesson_declined', 'Trial Declined', `Your trial request was declined. Find another mentor`);
+                      }}
+                      className={`flex-1 border text-[10px] font-bold py-3 rounded-full transition-colors ${isDark ? 'border-white/10 text-white hover:bg-white/5' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
+                    >
                       Decline
                     </button>
                   </div>
@@ -3534,7 +4143,12 @@ export default function App() {
                       <span className="text-[9px] font-bold text-harbour-500/80 uppercase tracking-tight">Confirmed</span>
                     </div>
                     <button 
-                      onClick={() => setView('log-session')}
+                      onClick={() => {
+                        const student = MOCK_STUDENTS.find(s => s.id === lesson.studentId);
+                        if (student) setSelectedStudent(student);
+                        setSelectedLesson(lesson);
+                        setView('log-session');
+                      }}
                       className="flex items-center gap-1.5 text-[10px] font-bold text-harbour-500 hover:text-harbour-400 transition-colors bg-walnut-50 px-3 py-1.5 rounded-full"
                     >
                       <Plus size={12} /> Log Session
@@ -3550,7 +4164,7 @@ export default function App() {
   );
 
   const FullScheduleView = () => (
-    <div className="px-5 pt-12 pb-24 min-h-full bg-[#0A0A0A] text-white">
+    <div className="px-5 pt-12 min-h-full bg-[#0A0A0A] text-white">
       <header className="flex items-center gap-4 mb-6">
         <button 
           onClick={() => setView('home')}
@@ -3663,7 +4277,7 @@ export default function App() {
   );
 
   const StudentsView = () => (
-    <div className="px-5 pt-12 pb-24">
+    <div className="px-5 pt-12">
       <header className="mb-4">
         <span className="text-[8px] uppercase tracking-[0.3em] font-mono font-semibold text-zinc-400 mb-1 block">Roster</span>
         <h1 className="text-2xl font-serif-sturdy">Active Students</h1>
@@ -3706,40 +4320,44 @@ export default function App() {
 
   const MessagesView = () => {
     if (selectedChat) {
-      return <ChatConversation recipient={selectedChat} onBack={() => setSelectedChat(null)} dark={true} />;
+      return <ChatConversation recipient={selectedChat} onBack={() => setSelectedChat(null)} dark={isDark} />;
     }
 
     return (
-      <div className="h-full flex flex-col pt-16 pb-20">
-        <div className="px-5 mb-4">
-          <h1 className="text-2xl font-serif-curvy italic mb-4">Student Messages</h1>
+      <div className={`h-full flex flex-col pt-16 ${isDark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
+        <div className="px-5 mb-6">
+          <h1 className={`text-3xl font-serif-sturdy mb-6 ${isDark ? 'text-white' : 'text-zinc-900'}`}>Student Messages</h1>
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" size={14} />
-            <input className="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-2 text-xs focus:outline-none" placeholder="Search students..." />
+            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-white/30' : 'text-zinc-400'}`} size={14} />
+            <input 
+              className={`w-full border rounded-full pl-10 pr-4 py-3 text-xs focus:outline-none ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`} 
+              placeholder="Search students..." 
+            />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 space-y-2">
+        <div className="flex-1 overflow-y-auto px-5 space-y-3">
           {MOCK_STUDENTS.map((student, i) => (
             <div 
               key={student.id} 
               onClick={() => setSelectedChat(student)}
-              className={`p-3 rounded-xl border transition-all cursor-pointer ${i === 0 ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5'}`}
+              className={`p-4 rounded-3xl border transition-all cursor-pointer ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:border-zinc-200'}`}
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-4">
                 <div className="relative">
-                  <img src={student.photo} className="w-9 h-9 rounded-lg object-cover" referrerPolicy="no-referrer" />
-                  {i === 0 && <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-white border-2 border-black rounded-full" />}
+                  <img src={student.photo} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+                  {i === 0 && <div className={`absolute -top-1 -right-1 w-3.5 h-3.5 bg-harbour-500 rounded-full border-2 ${isDark ? 'border-black' : 'border-white'}`} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start mb-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-xs font-bold truncate">{student.name}</h3>
-                      <span className="px-1 py-0.5 bg-white/10 text-white/40 text-[6px] font-bold rounded uppercase tracking-widest">Student</span>
+                      <h3 className="text-sm font-bold truncate">{student.name}</h3>
+                      <span className={`px-1.5 py-0.5 text-[7px] font-bold rounded uppercase tracking-widest ${isDark ? 'bg-white/10 text-white/40' : 'bg-zinc-100 text-zinc-500'}`}>Student</span>
                     </div>
-                    <span className="text-[7px] font-mono text-white/30">12:45</span>
+                    <span className={`text-[8px] font-mono ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>12:45 PM</span>
                   </div>
-                  <p className="text-[9px] text-white/50 truncate">Thanks for the feedback!</p>
+                  <p className="text-[9px] text-harbour-400 uppercase tracking-widest mb-1">{student.instrument}</p>
+                  <p className={`text-[11px] truncate ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>Thanks for the feedback! Looking forward to our next session.</p>
                 </div>
               </div>
             </div>
@@ -3782,7 +4400,7 @@ export default function App() {
     };
 
     return (
-      <div className="px-5 pt-12 pb-24 bg-zinc-50 min-h-full">
+      <div className="px-5 pt-12 bg-zinc-50 min-h-full">
         <header className="mb-6">
           <span className="text-[8px] uppercase tracking-[0.3em] font-mono font-semibold text-zinc-400 mb-1 block">Financials</span>
           <h1 className="text-2xl font-serif-sturdy text-zinc-900">Wallet</h1>
@@ -4044,7 +4662,7 @@ export default function App() {
     ];
 
     return (
-      <div className="h-full bg-zinc-50 overflow-y-auto pb-32">
+      <div className="h-full bg-zinc-50 overflow-y-auto">
         {/* Premium Header */}
         <header className="relative px-6 pt-16 pb-12 bg-zinc-900 text-white overflow-hidden">
           {/* Decorative elements */}
@@ -4167,13 +4785,26 @@ export default function App() {
             </div>
             
             <div className="bg-white rounded-[2.5rem] border border-zinc-100 overflow-hidden shadow-sm">
+              <div className="p-5 flex items-center justify-between border-b border-zinc-50">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center">
+                    <Bell size={18} />
+                  </div>
+                  <span className="text-sm font-bold text-zinc-700">Notifications</span>
+                </div>
+                <button 
+                  onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                  className={`w-12 h-6 rounded-full relative transition-colors ${notificationsEnabled ? 'bg-harbour-500' : 'bg-zinc-300'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${notificationsEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
               {[
-                { icon: Bell, label: 'Notifications', color: 'text-blue-500', bg: 'bg-blue-50' },
                 { icon: FileText, label: 'Rules & Information', color: 'text-zinc-400', bg: 'bg-zinc-50' },
               ].map((item, i) => (
                 <button 
-                  key={i} 
-                  className={`w-full p-5 flex items-center justify-between hover:bg-zinc-50 transition-colors ${i !== 1 ? 'border-b border-zinc-50' : ''}`}
+                  key={item.label} 
+                  className={`w-full p-5 flex items-center justify-between hover:bg-zinc-50 transition-colors ${i !== 0 ? 'border-b border-zinc-50' : ''}`}
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 ${item.bg} ${item.color} rounded-xl flex items-center justify-center`}>
@@ -4187,7 +4818,7 @@ export default function App() {
             </div>
 
             <button 
-              onClick={() => { setIsAuth(false); setView('registration'); }}
+              onClick={handleLogout}
               className="w-full mt-6 p-6 flex items-center justify-center gap-3 bg-red-50 text-red-600 rounded-[2rem] font-bold text-sm transition-all"
             >
               <LogOut size={18} />
@@ -4298,64 +4929,220 @@ export default function App() {
       </div>
     );
   };
-  const LogSessionView = () => (
-    <div className="px-5 pt-16 pb-24 bg-white text-zinc-900 min-h-screen">
-      <button onClick={() => setView('home')} className="flex items-center gap-1 text-zinc-400 mb-6 text-[10px] uppercase tracking-widest font-bold">
-        <ChevronLeft size={14} /> Back
-      </button>
+  const LogSessionView = () => {
+    if (!selectedStudent || !selectedLesson) return null;
+
+    const handleAIGenerate = async () => {
+      if (!aiBrainDump) return;
+      setIsGenerating(true);
       
-      <header className="mb-8">
-        <Badge variant="gold">Lesson #5</Badge>
-        <h1 className="text-2xl font-serif-sturdy mt-2 text-zinc-900">Sarah Jenkins</h1>
-        <p className="text-zinc-400 text-[10px]">Piano • Advanced Harmony</p>
-      </header>
+      // Simulate AI processing the brain dump
+      setTimeout(() => {
+        const sentences = aiBrainDump.split('.').filter(s => s.trim().length > 0);
+        const coveredText = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
+        const focusText = sentences.slice(Math.ceil(sentences.length / 2)).join('. ') + '.';
+        
+        setCovered(coveredText || "Focused on " + selectedStudent.instrument + " techniques discussed today.");
+        setNextFocus(focusText || "Continue practicing the exercises from today's lesson.");
+        
+        if (aiBrainDump.length > 50 && selectedStudent.learningPath && selectedStudent.learningPath.length > 0) {
+          setSelectedMilestones([selectedStudent.learningPath[0].id]);
+        }
+        
+        setIsGenerating(false);
+        setShowAIGenerateSheet(false);
+        setAiBrainDump('');
+      }, 1500);
+    };
 
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Covered</label>
-          <textarea 
-            className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[80px] focus:outline-none text-zinc-900"
-            placeholder="Topics explored..."
-          />
-        </div>
+    const handleSave = () => {
+      triggerNotification('session_logged', 'Session Logged', `${mentorProfile.name} has added notes from your Lesson ${selectedLesson.lessonNumber}`);
+      if (selectedMilestones.length > 0) {
+        const milestone = selectedStudent.learningPath?.find(m => m.id === selectedMilestones[0]);
+        if (milestone) {
+          triggerNotification('milestone_completed', 'Milestone Completed', `You completed ${milestone.title}! Keep going`);
+        }
+      }
+      setView('home');
+    };
 
-        <div className="space-y-2">
-          <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Next Focus</label>
-          <textarea 
-            className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[60px] focus:outline-none text-zinc-900"
-            placeholder="Preparation..."
-          />
-        </div>
+    return (
+      <div className="bg-white text-zinc-900 min-h-screen flex flex-col">
+        <div className="px-5 pt-16 pb-32 flex-1 overflow-y-auto scrollbar-hide">
+          <button onClick={() => setView('home')} className="flex items-center gap-1 text-zinc-400 mb-6 text-[10px] uppercase tracking-widest font-bold">
+            <ChevronLeft size={14} /> Back
+          </button>
+          
+          <header className="mb-8">
+            <h1 className="text-xl font-serif-sturdy text-zinc-900 leading-tight">
+              Log Session — {selectedStudent.name} · Lesson #{selectedLesson.lessonNumber}
+            </h1>
+          </header>
 
-        <div className="space-y-3">
-          <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Milestones</label>
-          <div className="grid grid-cols-1 gap-2">
-            {['Secondary Dominants', 'Chromatic Alteration'].map(m => (
-              <label key={m} className="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded-full border-zinc-300" />
-                <span className="text-[10px] font-medium text-zinc-900">{m}</span>
-              </label>
-            ))}
+          <div className="space-y-8">
+            {/* Session Rating */}
+            <div className="space-y-3">
+              <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">How was this session?</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button 
+                    key={star} 
+                    onClick={() => setSessionRating(star)}
+                    className={`transition-colors ${sessionRating >= star ? 'text-amber-400' : 'text-zinc-200'}`}
+                  >
+                    <Star size={24} fill={sessionRating >= star ? 'currentColor' : 'none'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Student Mood */}
+            <div className="space-y-3">
+              <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Student Mood</label>
+              <div className="flex gap-2">
+                {(['Engaged', 'Distracted', 'Tired'] as const).map((mood) => (
+                  <button
+                    key={mood}
+                    onClick={() => setStudentMood(mood)}
+                    className={`flex-1 py-2.5 rounded-full text-[10px] font-bold transition-all border ${
+                      studentMood === mood 
+                        ? 'bg-harbour-600 border-harbour-600 text-white' 
+                        : 'bg-zinc-900 border-zinc-900 text-zinc-400'
+                    }`}
+                  >
+                    {mood}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Generate Button */}
+            <button 
+              onClick={() => setShowAIGenerateSheet(true)}
+              className="w-full py-4 bg-zinc-50 border border-zinc-100 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-900 shadow-sm"
+            >
+              <TrendingUp size={16} className="text-harbour-600" /> AI Generate Log
+            </button>
+
+            {/* Covered Textarea */}
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">What did you cover?</label>
+              <textarea 
+                value={covered}
+                onChange={(e) => setCovered(e.target.value)}
+                className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900 leading-relaxed"
+                placeholder="Topics taught, techniques explored..."
+              />
+            </div>
+
+            {/* Next Focus Textarea */}
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Practice focus for next session</label>
+              <textarea 
+                value={nextFocus}
+                onChange={(e) => setNextFocus(e.target.value)}
+                className="w-full bg-amber-50/30 border border-amber-100/50 rounded-2xl p-4 text-xs min-h-[80px] focus:outline-none text-zinc-900 italic"
+                placeholder="What should the student work on?"
+              />
+            </div>
+
+            {/* Milestones Checklist */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Milestones Reached</label>
+                <button className="text-[8px] font-bold text-harbour-600 flex items-center gap-1">
+                  <Plus size={10} /> Add New
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(selectedStudent.learningPath || []).map(m => (
+                  <button 
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedMilestones(prev => 
+                        prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                      );
+                    }}
+                    className={`px-4 py-2.5 rounded-2xl text-[10px] font-bold border transition-all flex items-center gap-2.5 ${
+                      selectedMilestones.includes(m.id)
+                        ? 'bg-zinc-900 border-zinc-900 text-white shadow-md shadow-zinc-900/10'
+                        : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                      selectedMilestones.includes(m.id) ? 'bg-white border-white text-zinc-900' : 'border-zinc-200'
+                    }`}>
+                      {selectedMilestones.includes(m.id) && <Check size={10} strokeWidth={3} />}
+                    </div>
+                    {m.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Attach Materials */}
+            <div className="space-y-3">
+              <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Learning Materials</label>
+              <button className="w-full py-4 border-2 border-dashed border-zinc-100 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:bg-zinc-50 transition-colors">
+                <Paperclip size={16} /> Attach PDF, Sheet or Guide
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-3 pt-4">
-          <button className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400">
-            <Paperclip size={18} />
-          </button>
+        {/* Sticky Save Button */}
+        <div className="p-5 bg-white/80 backdrop-blur-md border-t border-zinc-100">
           <button 
-            onClick={() => setView('home')}
-            className="flex-1 bg-zinc-900 text-white text-xs font-bold py-4 rounded-full"
+            onClick={handleSave}
+            className="w-full bg-harbour-600 text-white py-4 rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-harbour-600/20"
           >
-            Save & Log
+            Save and Log Session
           </button>
         </div>
+
+        {/* AI Generate Bottom Sheet */}
+        <BottomSheet 
+          isOpen={showAIGenerateSheet} 
+          onClose={() => setShowAIGenerateSheet(false)}
+          dark={false}
+        >
+          <div className="px-6 pb-10 space-y-6">
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Type a quick brain dump of what happened in the lesson. AI will structure it into a beautiful log for your student.
+            </p>
+            <textarea 
+              value={aiBrainDump}
+              onChange={(e) => setAiBrainDump(e.target.value)}
+              className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900"
+              placeholder="e.g. Sarah did great today. We finished the D major scale and started the first page of Zapin Melayu. She needs to work on her thumb position."
+            />
+            <button 
+              onClick={handleAIGenerate}
+              disabled={isGenerating || !aiBrainDump}
+              className={`w-full py-4 rounded-2xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                isGenerating || !aiBrainDump ? 'bg-zinc-100 text-zinc-400' : 'bg-harbour-600 text-white shadow-lg'
+              }`}
+            >
+              {isGenerating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <TrendingUp size={16} /> Generate Log
+                </>
+              )}
+            </button>
+          </div>
+        </BottomSheet>
       </div>
-    </div>
-  );
+    );
+  };
 
   const StudentDetailView = () => {
     if (!selectedStudent) return null;
+
     const studentLogs = MOCK_SESSION_LOGS.filter(log => log.studentId === selectedStudent.id);
     const studentMaterials = MOCK_MATERIALS.filter(mat => mat.studentId === selectedStudent.id);
 
@@ -4363,260 +5150,643 @@ export default function App() {
       if (!selectedStudent || !selectedStudent.learningPath) return;
       const newPath = selectedStudent.learningPath.map(m => {
         if (m.id === milestoneId) {
-          return { ...m, status: m.status === 'completed' ? 'upcoming' : 'completed' } as Milestone;
+          const nextStatus = m.status === 'completed' ? 'upcoming' : 'completed';
+          return { ...m, status: nextStatus } as Milestone;
         }
         return m;
       });
       setSelectedStudent({ ...selectedStudent, learningPath: newPath });
     };
 
-    return (
-      <div className="px-5 pt-16 pb-24 bg-zinc-50 min-h-full">
-        <button onClick={() => setView('students')} className="flex items-center gap-1 text-zinc-400 mb-6 text-[10px] uppercase tracking-widest font-bold">
-          <ChevronLeft size={14} /> Back to Roster
-        </button>
+    const VisibilityBadge = ({ type }: { type: 'student' | 'mentor' }) => (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wider ${
+        type === 'student' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+      }`}>
+        {type === 'student' ? <><span className="text-[9px]">👁</span> Student sees</> : <><Lock size={8} /> Mentor Only</>}
+      </span>
+    );
 
-        <header className="mb-8 flex gap-5 items-center">
-          <div className="relative">
-            <img src={selectedStudent.photo} className="w-24 h-24 rounded-[2rem] object-cover shadow-xl border-4 border-white" referrerPolicy="no-referrer" />
+    return (
+      <div className="bg-zinc-50 min-h-screen flex flex-col">
+        {/* Header — Dark Section */}
+        <header className="bg-pine-950 text-white px-5 pt-16 pb-8 relative overflow-hidden">
+          {/* Breadcrumb */}
+          <div className="flex items-center justify-between mb-8 relative z-10">
+            <button onClick={() => setView('students')} className="flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+              <ChevronLeft size={20} />
+              <span className="text-xs font-bold uppercase tracking-widest">{selectedStudent.name.split(' ')[0]}'s Profile</span>
+            </button>
+            <button className="p-2 text-white/40 hover:text-white">
+              <MoreHorizontal size={20} />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex gap-1.5 mb-2">
-              <Badge variant="gold">{selectedStudent.package}</Badge>
-              <Badge variant="outline">Active</Badge>
+
+          {/* Identity Section */}
+          <div className="flex flex-col items-center text-center mb-8 relative z-10">
+            <div className="relative mb-4">
+              <img 
+                src={selectedStudent.photo} 
+                className="w-[58px] h-[58px] rounded-xl object-cover shadow-2xl border border-white/10" 
+                referrerPolicy="no-referrer" 
+              />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-teal-500 border-2 border-pine-950 rounded-full shadow-lg" />
             </div>
-            <h1 className="text-2xl font-serif-sturdy text-zinc-900 leading-tight">{selectedStudent.name}</h1>
-            <p className="text-xs text-zinc-500 font-medium">{selectedStudent.instrument} • {selectedStudent.stage}</p>
+            <h1 className="text-[22px] font-serif text-white mb-3">{selectedStudent.name}</h1>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-bold uppercase tracking-widest text-white/60">{selectedStudent.package}</span>
+              <span className="px-3 py-1 bg-teal-500/20 border border-teal-500/30 rounded-full text-[9px] font-bold uppercase tracking-widest text-teal-400">Active</span>
+              <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-bold uppercase tracking-widest text-white/60">{selectedStudent.instrument}</span>
+            </div>
+          </div>
+
+          {/* Stats Strip */}
+          <div className="grid grid-cols-3 gap-4 py-6 border-y border-white/5 relative z-10">
+            <div className="text-center">
+              <p className="text-[8px] uppercase tracking-widest font-bold text-white/30 mb-1">Done</p>
+              <p className="text-sm font-bold text-teal-400">4/8 <span className="text-[10px] text-white/20">lessons</span></p>
+            </div>
+            <div className="text-center border-x border-white/5">
+              <p className="text-[8px] uppercase tracking-widest font-bold text-white/30 mb-1">Progress</p>
+              <p className="text-sm font-bold text-white">50%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] uppercase tracking-widest font-bold text-white/30 mb-1">Last</p>
+              <p className="text-sm font-bold text-amber-400">Mar 18</p>
+            </div>
+          </div>
+
+          {/* Progress Bar Area */}
+          <div className="mt-6 relative z-10">
+            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden mb-3">
+              <div className="h-full w-1/2 bg-gradient-to-r from-teal-600 to-teal-400 rounded-full" />
+            </div>
+            <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-widest">
+              <span className="text-white/40">Stage 2 of 4</span>
+              <span className="text-teal-400">On Track</span>
+            </div>
           </div>
         </header>
 
-        <div className="space-y-10">
-          {/* Section 1 — Learning Path */}
-          <section>
-            <div className="flex items-center justify-between mb-5">
+        <div className="flex-1 overflow-y-auto px-5 pt-8 pb-32 space-y-10">
+          {/* Section 1 — Private Notes */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Private Notes</h2>
+              <VisibilityBadge type="mentor" />
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-3 opacity-10">
+                <Lock size={40} className="text-amber-900" />
+              </div>
+              <p className="text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-4">
+                "Sarah responds really well to visual metaphors. She's struggling with the bridge section of 'Zapin Melayu' but her finger strength has improved significantly. Remind her to keep her thumb relaxed during the faster passages."
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
+                <button className="text-[9px] font-bold text-amber-700 underline underline-offset-2">Edit Notes</button>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 2 — Learning Path */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
               <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Learning Path</h2>
-              <button className="text-[10px] font-bold text-zinc-900 flex items-center gap-1 bg-white px-3 py-1.5 rounded-full shadow-sm border border-zinc-100">
-                <Edit2 size={10} /> Edit Path
-              </button>
+              <VisibilityBadge type="student" />
             </div>
             
-            <div className="relative pl-8 space-y-6">
+            <div className="relative space-y-4">
               {/* Vertical Line */}
-              <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-zinc-200" />
+              <div className="absolute left-[11px] top-4 bottom-4 w-0.5 bg-zinc-200" />
               
-              {(selectedStudent.learningPath || []).map((milestone, i) => (
-                <div key={milestone.id} className="relative">
-                  {/* Milestone Dot */}
-                  <button 
-                    onClick={() => toggleMilestone(milestone.id)}
-                    className={`absolute -left-[29px] top-1.5 w-5 h-5 rounded-full border-4 border-zinc-50 flex items-center justify-center z-10 transition-all ${
-                      milestone.status === 'completed' ? 'bg-harbour-500' : 
-                      milestone.status === 'current' ? 'bg-zinc-900' : 'bg-zinc-300'
-                    }`}
-                  >
-                    {milestone.status === 'completed' && <CheckCircle2 size={10} className="text-white" />}
-                  </button>
+              {(selectedStudent.learningPath || []).map((milestone, i) => {
+                const isCompleted = milestone.status === 'completed';
+                const isCurrent = milestone.status === 'current';
+                const isUpcoming = milestone.status === 'upcoming';
 
-                  <div 
-                    onClick={() => toggleMilestone(milestone.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                      milestone.status === 'completed' ? 'bg-white border-walnut-100 opacity-60' : 
-                      milestone.status === 'current' ? 'bg-white border-zinc-900 shadow-md ring-1 ring-zinc-900' : 
-                      'bg-white border-zinc-100 opacity-40'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-mono uppercase tracking-widest text-zinc-400 mb-0.5">Stage {i + 1}</span>
-                        <span className="text-xs font-bold text-zinc-900">{milestone.title}</span>
+                return (
+                  <div key={milestone.id} className={`relative pl-10 transition-opacity duration-300 ${isUpcoming ? 'opacity-45' : 'opacity-100'}`}>
+                    {/* Milestone Dot */}
+                    <div className={`absolute left-0 top-1.5 w-6 h-6 rounded-full border-4 border-zinc-50 flex items-center justify-center z-10 transition-all ${
+                      isCompleted ? 'bg-teal-500' : isCurrent ? 'bg-zinc-900' : 'bg-zinc-300'
+                    }`}>
+                      {isCompleted ? <Check size={12} className="text-white" strokeWidth={3} /> : isUpcoming ? <Lock size={10} className="text-white" /> : null}
+                    </div>
+
+                    <div 
+                      onClick={() => toggleMilestone(milestone.id)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                        isCurrent ? 'bg-white border-zinc-900 shadow-lg shadow-zinc-900/5 ring-1 ring-zinc-900' : 'bg-white border-zinc-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Stage {i + 1}</p>
+                          <h3 className={`text-xs font-bold ${isCurrent ? 'text-zinc-900' : 'text-zinc-600'}`}>{milestone.title}</h3>
+                        </div>
+                        {isCompleted && <span className="text-[8px] font-bold text-teal-600 uppercase tracking-widest">Completed</span>}
                       </div>
-                      <button className="p-1.5 text-zinc-300 hover:text-zinc-900 transition-colors">
-                        <Edit2 size={12} />
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              <button className="w-full py-4 border-2 border-dashed border-zinc-200 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:border-zinc-400 hover:text-zinc-600 transition-all">
+              <button 
+                onClick={() => setShowAddMilestoneSheet(true)}
+                className="w-full py-4 border-2 border-dashed border-zinc-200 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:border-zinc-900 hover:text-zinc-900 transition-all mt-4 ml-10"
+              >
                 <Plus size={16} />
                 <span className="text-[10px] font-bold uppercase tracking-widest">Add New Stage</span>
               </button>
             </div>
           </section>
 
-          {/* Section 2 — Session Logs */}
-          <section>
-            <div className="flex items-center justify-between mb-5">
+          {/* Section 3 — Session Logs */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
               <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Session Logs</h2>
-              <button className="text-[10px] font-bold text-walnut-600 flex items-center gap-1 bg-walnut-50 px-3 py-1.5 rounded-full border border-walnut-100">
-                <Plus size={12} /> Add Manual Log
-              </button>
+              <VisibilityBadge type="student" />
             </div>
 
-            <div className="space-y-4">
-              {studentLogs.map(log => (
-                <div key={log.id} className="bg-white border border-zinc-100 rounded-[1.5rem] p-5 shadow-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="gold">Lesson #{log.lessonNumber}</Badge>
-                        <span className="text-[10px] font-mono text-zinc-400">{new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <div className="space-y-3">
+              {studentLogs.map((log, i) => {
+                const isExpanded = expandedLogId === log.id;
+                return (
+                  <div key={log.id} className="bg-white border border-zinc-100 rounded-2xl overflow-hidden transition-all duration-300">
+                    <button 
+                      onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      className="w-full p-4 flex items-center justify-between text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-[10px] font-bold">#{log.lessonNumber}</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-900">{isExpanded ? 'Lesson Summary' : `Lesson #${log.lessonNumber} Summary`}</h4>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-widest font-medium">{new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                        </div>
                       </div>
-                    </div>
-                    <button className="p-2 -mr-2 text-zinc-300 hover:text-zinc-900">
-                      <Edit2 size={14} />
+                      <ChevronRight size={16} className={`text-zinc-300 transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
                     </button>
-                  </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[8px] uppercase tracking-widest font-bold text-zinc-400 mb-1.5">What was covered</p>
-                      <p className="text-[11px] text-zinc-600 leading-relaxed">{log.covered}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] uppercase tracking-widest font-bold text-zinc-400 mb-1.5">Practice Focus</p>
-                      <p className="text-[11px] font-serif-curvy italic text-zinc-900 bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">{log.focus}</p>
-                    </div>
-                    
-                    {log.milestones.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {log.milestones.map(mId => {
-                          const m = selectedStudent.learningPath?.find(lp => lp.id === mId);
-                          return m ? <span key={mId} className="text-[8px] font-bold bg-walnut-50 text-walnut-700 px-2 py-1 rounded-full border border-walnut-100 flex items-center gap-1">
-                            <CheckCircle2 size={8} /> {m.title}
-                          </span> : null;
-                        })}
-                      </div>
-                    )}
-
-                    {log.materials.length > 0 && (
-                      <div className="pt-3 border-t border-zinc-50 flex gap-2 overflow-x-auto scrollbar-hide">
-                        {log.materials.map(matId => {
-                          const mat = studentMaterials.find(m => m.id === matId);
-                          return mat ? (
-                            <div key={matId} className="flex items-center gap-2 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-100 min-w-max">
-                              <FileText size={12} className="text-zinc-400" />
-                              <span className="text-[9px] font-medium text-zinc-600">{mat.title}</span>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-5 space-y-5 border-t border-zinc-50 pt-4">
+                            <div>
+                              <p className="text-[8px] uppercase tracking-widest font-bold text-zinc-400 mb-2">What we covered</p>
+                              <p className="text-xs text-zinc-600 leading-relaxed">{log.covered}</p>
                             </div>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
+                            <div className="bg-teal-50/30 border-l-4 border-teal-500 p-4 rounded-r-xl">
+                              <p className="text-[8px] uppercase tracking-widest font-bold text-teal-600 mb-2">Practice Focus</p>
+                              <p className="text-xs text-zinc-900 font-medium italic">"{log.focus}"</p>
+                            </div>
+                            {log.milestones.length > 0 && (
+                              <div>
+                                <p className="text-[8px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Milestones Reached</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {log.milestones.map(mId => {
+                                    const m = selectedStudent.learningPath?.find(lp => lp.id === mId);
+                                    return m ? (
+                                      <span key={mId} className="px-2 py-1 bg-zinc-100 text-zinc-600 text-[8px] font-bold rounded-md uppercase tracking-wider">
+                                        {m.title}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <div className="pt-4 border-t border-zinc-50">
+                              <p className="text-[9px] text-zinc-400 italic">"Great progress today, {selectedStudent.name.split(' ')[0]}! Keep up the consistent practice." — AI Summary</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              <button 
+                onClick={() => {
+                  const lastLog = studentLogs.sort((a,b) => b.lessonNumber - a.lessonNumber)[0];
+                  const nextLessonNumber = lastLog ? lastLog.lessonNumber + 1 : 1;
+                  setSelectedLesson({
+                    id: 'manual-' + Date.now(),
+                    studentId: selectedStudent.id,
+                    studentName: selectedStudent.name,
+                    instrument: selectedStudent.instrument,
+                    time: 'Manual',
+                    date: new Date().toISOString(),
+                    lessonNumber: nextLessonNumber,
+                    type: 'Manual',
+                    status: 'confirmed'
+                  });
+                  setView('log-session');
+                }}
+                className="w-full py-4 border-2 border-dashed border-zinc-200 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:border-zinc-900 hover:text-zinc-900 transition-all mt-4"
+              >
+                <Plus size={16} />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Add Manual Log</span>
+              </button>
             </div>
           </section>
 
-          {/* Section 3 — Materials */}
-          <section>
-            <div className="flex items-center justify-between mb-5">
+          {/* Section 4 — Materials */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
               <h2 className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Materials</h2>
-              <button className="text-[10px] font-bold text-zinc-900 flex items-center gap-1 bg-white px-3 py-1.5 rounded-full shadow-sm border border-zinc-100">
-                <Upload size={12} /> Upload New
-              </button>
+              <VisibilityBadge type="student" />
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-3">
               {studentMaterials.map(mat => (
-                <div key={mat.id} className="bg-white border border-zinc-100 p-4 rounded-2xl flex items-center gap-4 group">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${mat.type === 'Notes' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
-                    {mat.type === 'Notes' ? <FileText size={18} /> : <BookOpen size={18} />}
+                <div key={mat.id} className="bg-white border border-zinc-100 p-4 rounded-2xl flex items-center gap-4 group hover:border-zinc-200 transition-all">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${mat.type === 'PDF' || mat.type === 'Notes' ? 'bg-teal-50 text-teal-600' : 'bg-zinc-100 text-zinc-400'}`}>
+                    {mat.type === 'PDF' ? <FileText size={18} /> : <BookOpen size={18} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[8px] font-mono uppercase tracking-widest opacity-40">{mat.type}</span>
-                      <span className="w-1 h-1 bg-zinc-200 rounded-full" />
-                      <span className="text-[8px] font-mono text-zinc-400">Lesson #{mat.lessonId?.replace('l', '')}</span>
-                    </div>
                     <h3 className="text-xs font-bold text-zinc-900 truncate">{mat.title}</h3>
+                    <p className="text-[9px] text-zinc-400 font-medium uppercase tracking-widest mt-0.5">Lesson #{mat.lessonId?.replace('l', '') || 'General'}</p>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 text-zinc-300 hover:text-zinc-900"><Edit2 size={12} /></button>
-                    <button className="p-2 text-zinc-300 hover:text-zinc-900"><Move size={12} /></button>
-                    <button className="p-2 text-zinc-300 hover:text-red-500"><Trash2 size={12} /></button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-2 text-zinc-300 hover:text-zinc-900 transition-colors">
+                      <Edit2 size={14} />
+                    </button>
+                    <button className="p-2 text-zinc-300 hover:text-red-500 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
+                  <button className="p-2 text-zinc-300 hover:text-zinc-900 transition-colors">
+                    <Download size={16} />
+                  </button>
                 </div>
               ))}
-            </div>
-          </section>
-
-          {/* Section 4 — Package Details */}
-          <section className="bg-zinc-900 text-white p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl" />
-            <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/40 mb-6">Package Details</h2>
-            
-            <div className="grid grid-cols-2 gap-8 mb-8">
-              <div>
-                <p className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1">Type</p>
-                <p className="text-lg font-serif-sturdy">{selectedStudent.package}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1">Status</p>
-                <p className="text-lg font-serif-sturdy text-harbour-400">Active</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1">Progress</p>
-                  <p className="text-2xl font-serif-sturdy">
-                    {selectedStudent.totalLessons ? selectedStudent.totalLessons - selectedStudent.lessonsRemaining : 0} 
-                    <span className="text-sm text-white/30 font-sans ml-1">/ {selectedStudent.totalLessons || 8} lessons</span>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1">Remaining</p>
-                  <p className="text-2xl font-serif-sturdy text-amber-400">{selectedStudent.lessonsRemaining}</p>
-                </div>
-              </div>
-              <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-white rounded-full transition-all duration-1000" 
-                  style={{ width: `${((selectedStudent.totalLessons ? selectedStudent.totalLessons - selectedStudent.lessonsRemaining : 0) / (selectedStudent.totalLessons || 8)) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <button className="w-full mt-8 py-4 bg-white text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full shadow-xl transition-transform">
-              Renew Package
-            </button>
-          </section>
-
-          {/* Section 5 — Notes About This Student */}
-          <section className="bg-amber-50/50 border border-amber-100 p-8 rounded-[2.5rem]">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
-                  <FileText size={16} />
-                </div>
-                <h2 className="text-[10px] uppercase tracking-widest font-bold text-amber-900/40">Private Mentor Notes</h2>
-              </div>
-              <button className="p-2 text-amber-900/20 hover:text-amber-900/60 transition-colors">
-                <Edit2 size={16} />
+              <button 
+                onClick={() => setShowAddMaterialSheet(true)}
+                className="w-full py-4 border-2 border-dashed border-zinc-200 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:border-teal-500 hover:text-teal-600 transition-all mt-4"
+              >
+                <Upload size={16} />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Upload New Material</span>
               </button>
             </div>
-            
-            <div className="relative">
-              <div className="absolute -left-4 top-0 bottom-0 w-1 bg-amber-200/50 rounded-full" />
-              <p className="text-xs text-amber-900/70 leading-relaxed font-medium italic">
-                "{selectedStudent.privateNotes || 'No private notes yet. Add some to track student preferences and learning style.'}"
-              </p>
-            </div>
-            
-            <div className="mt-6 flex items-center gap-2 text-[8px] font-bold text-amber-900/30 uppercase tracking-widest">
-              <CheckCircle2 size={10} />
-              Only visible to you
-            </div>
           </section>
+        </div>
+
+        {/* Add Milestone Bottom Sheet */}
+        <BottomSheet 
+          isOpen={showAddMilestoneSheet} 
+          onClose={() => setShowAddMilestoneSheet(false)}
+          title="Add New Stage"
+          dark={false}
+        >
+          <div className="px-6 pb-10 space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Stage Title</label>
+              <input 
+                type="text" 
+                value={newMilestoneTitle}
+                onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                placeholder="e.g. Advanced Finger Picking"
+                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+              />
+            </div>
+            <button 
+              onClick={() => {
+                if (!newMilestoneTitle) return;
+                const newMilestone: Milestone = {
+                  id: 'm' + Date.now(),
+                  title: newMilestoneTitle,
+                  status: 'upcoming'
+                };
+                setSelectedStudent({
+                  ...selectedStudent,
+                  learningPath: [...(selectedStudent.learningPath || []), newMilestone]
+                });
+                setNewMilestoneTitle('');
+                setShowAddMilestoneSheet(false);
+              }}
+              className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+            >
+              Add Stage
+            </button>
+          </div>
+        </BottomSheet>
+
+        {/* Add Material Bottom Sheet */}
+        <BottomSheet 
+          isOpen={showAddMaterialSheet} 
+          onClose={() => setShowAddMaterialSheet(false)}
+          title="Upload Material"
+          dark={false}
+        >
+          <div className="px-6 pb-10 space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Material Title</label>
+              <input 
+                type="text" 
+                value={newMaterialTitle}
+                onChange={(e) => setNewMaterialTitle(e.target.value)}
+                placeholder="e.g. Scale Exercises PDF"
+                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Type</label>
+              <div className="flex gap-2">
+                {(['PDF', 'Guide', 'Notes'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setNewMaterialType(type)}
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${
+                      (newMaterialType as string) === (type as string)
+                        ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' 
+                        : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                if (!newMaterialTitle) return;
+                // In a real app we'd update MOCK_MATERIALS or a stateful equivalent
+                // For now we'll just close the sheet
+                setNewMaterialTitle('');
+                setShowAddMaterialSheet(false);
+              }}
+              className="w-full py-5 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+            >
+              Upload Material
+            </button>
+          </div>
+        </BottomSheet>
+
+        {/* Sticky Bottom Bar */}
+        <div className="fixed bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-xl border-t border-zinc-100 z-50 flex gap-3">
+          <button 
+            onClick={() => {
+              const chat = MOCK_MESSAGES.find(m => m.studentId === selectedStudent.id);
+              if (chat) {
+                setSelectedChat({
+                  id: chat.id,
+                  studentId: selectedStudent.id,
+                  studentName: selectedStudent.name,
+                  studentPhoto: selectedStudent.photo,
+                  lastMessage: chat.lastMessage,
+                  time: chat.timestamp,
+                  unread: 0,
+                  online: true
+                });
+              }
+              setView('messages');
+            }}
+            className="flex-1 py-4 border border-zinc-200 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-zinc-600 flex items-center justify-center gap-2 hover:bg-zinc-50 transition-all"
+          >
+            <MessageSquare size={16} /> Message
+          </button>
+          <button 
+            onClick={() => {
+              const lastLog = MOCK_SESSION_LOGS.filter(l => l.studentId === selectedStudent.id).sort((a,b) => b.lessonNumber - a.lessonNumber)[0];
+              const nextLessonNumber = lastLog ? lastLog.lessonNumber + 1 : 1;
+              setSelectedLesson({
+                id: 'new',
+                studentId: selectedStudent.id,
+                studentName: selectedStudent.name,
+                instrument: selectedStudent.instrument,
+                time: 'N/A',
+                date: new Date().toISOString(),
+                lessonNumber: nextLessonNumber,
+                type: 'Package',
+                status: 'confirmed'
+              });
+              setView('log-session');
+            }}
+            className="flex-[1.5] bg-zinc-900 text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 active:scale-95 transition-all"
+          >
+            <Plus size={16} /> Log Session
+          </button>
         </div>
       </div>
     );
   };
 
   // --- Main Render ---
+
+  const AIBuddySheet = () => {
+    const studentPrompts = [
+      "What should I practice today?",
+      "Summarize my last lesson",
+      "Explain my next milestone",
+      "What should I review before class?",
+      "Show my latest materials",
+      "Motivate me for practice",
+      "Help me understand this lesson",
+      "Create a 15-minute practice routine"
+    ];
+
+    const mentorPrompts = [
+      "Suggest a lesson summary",
+      "Draft a practice plan for Sarah",
+      "Analyze Marcus's progress",
+      "Recommend materials for next lesson",
+      "Draft an encouraging note"
+    ];
+
+    const prompts = isStudent ? studentPrompts : mentorPrompts;
+
+    return (
+      <BottomSheet 
+        isOpen={showAIBuddySheet} 
+        onClose={() => setShowAIBuddySheet(false)}
+      >
+        <div className="flex flex-col h-[75vh] bg-zinc-50/50">
+          {/* Header Info - Executive & Minimal */}
+          <div className="px-6 py-6 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-white">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 flex items-center justify-center text-harbour-500">
+                <Bot size={28} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="text-lg font-serif-sturdy tracking-tight text-white">
+                  {isStudent ? "Music Companion" : "Teaching Assistant"}
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Chat Area - Clean & Professional */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+            {aiBuddyMessages.length === 0 && (
+              <div className="text-center py-12 space-y-8">
+                <motion.div 
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="w-24 h-24 rounded-[3rem] shadow-2xl flex items-center justify-center mx-auto bg-zinc-900 text-harbour-500 border border-white/10"
+                >
+                  <Bot size={40} strokeWidth={1.5} />
+                </motion.div>
+                <div className="space-y-3 px-8">
+                  <h4 className="text-xl font-serif-sturdy text-zinc-900 tracking-tight">
+                    {isStudent ? "Elevate Your Practice" : "Maestro Teaching Assistant"}
+                  </h4>
+                  <p className="text-sm text-zinc-500 max-w-[280px] mx-auto leading-relaxed">
+                    {isStudent 
+                      ? "I'm your dedicated music companion, here to help you master your instrument between lessons." 
+                      : "I'm your AI-powered assistant, ready to help you draft summaries, create practice plans, and track student growth."}
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3 px-8 max-w-[320px] mx-auto">
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Quick Start</p>
+                  {(isStudent ? [
+                    { label: "Practice Plan", icon: Target, prompt: "What should I practice today?" },
+                    { label: "Lesson Recap", icon: MessageCircle, prompt: "Summarize my last lesson" },
+                    { label: "Next Steps", icon: Zap, prompt: "Explain my next milestone" },
+                    { label: "Ask Anything", icon: Sparkles, prompt: "" }
+                  ] : [
+                    { label: "Draft Lesson Summary", icon: MessageCircle, prompt: "Suggest a lesson summary" },
+                    { label: "Create Practice Plan", icon: Target, prompt: "Draft a practice plan for Sarah" },
+                    { label: "Analyze Progress", icon: Brain, prompt: "Analyze Marcus's progress" }
+                  ]).map((action) => (
+                    <button 
+                      key={action.label}
+                      onClick={() => handleAIBuddyAction(action.prompt || action.label)}
+                      className="flex items-center gap-4 p-4 bg-white border border-zinc-100 rounded-2xl hover:border-harbour-500 hover:shadow-lg hover:shadow-harbour-500/5 transition-all group"
+                    >
+                      <div className="p-2 bg-zinc-50 rounded-xl text-zinc-400 group-hover:text-harbour-500 transition-colors">
+                        <action.icon size={18} />
+                      </div>
+                      <span className="text-xs font-bold text-zinc-700">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {aiBuddyMessages.map((msg, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-[85%] p-4 rounded-3xl text-[13px] leading-relaxed shadow-sm transition-all ${
+                  msg.role === 'user' 
+                    ? 'bg-zinc-900 text-white rounded-tr-none' 
+                    : 'bg-white border border-zinc-100 text-zinc-700 rounded-tl-none'
+                }`}>
+                  {msg.content.split('\n').map((line, j) => (
+                    <p key={j} className={j > 0 ? 'mt-2' : ''}>{line}</p>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+
+            {isAiBuddyTyping && (
+              <div className="flex justify-start">
+                <div className="bg-white border border-zinc-100 p-4 rounded-3xl rounded-tl-none flex gap-1.5 shadow-sm">
+                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-zinc-300 rounded-full" />
+                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-zinc-300 rounded-full" />
+                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-zinc-300 rounded-full" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions - Professional Tags */}
+          <div className="p-4 border-t border-zinc-100 bg-white">
+            <div className="flex items-center gap-2 mb-3 px-2">
+              <Sparkles size={12} className="text-harbour-500" />
+              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Suggested for you</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {prompts.map((prompt) => (
+                <button 
+                  key={prompt}
+                  onClick={() => handleAIBuddyAction(prompt)}
+                  className="flex-shrink-0 px-4 py-2.5 bg-zinc-50 border border-zinc-100 rounded-xl text-[10px] font-bold text-zinc-600 hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all active:scale-95"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Input Area - Executive & Sleek */}
+          <div className="p-5 bg-white border-t border-zinc-100">
+            <div className="relative group">
+              <input 
+                type="text" 
+                placeholder={isStudent ? "Ask your music companion..." : "Ask your teaching assistant..."}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4.5 pl-5 pr-14 text-sm focus:outline-none focus:border-zinc-900 focus:bg-white transition-all shadow-inner"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    handleAIBuddyAction(e.currentTarget.value);
+                    e.currentTarget.value = '';
+                  }
+                }}
+              />
+              <button className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 bg-zinc-900 text-white rounded-xl flex items-center justify-center active:scale-90 transition-all shadow-xl shadow-zinc-900/20">
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
+    );
+  };
+
+  const handleAIBuddyAction = (action: string) => {
+    setAiBuddyMessages(prev => [...prev, { role: 'user', content: action }]);
+    setIsAiBuddyTyping(true);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      let response = "";
+      if (isStudent) {
+        if (action === "What should I practice today?") {
+          response = "Based on your last lesson with Cikgu Aris, you should focus on smooth bow control and clean transitions between Sa–Ri–Ga. I recommend a 20-minute session: 5 mins warm-up, 10 mins bowing exercise, and 5 mins slow note transitions.";
+        } else if (action === "Summarize my last lesson") {
+          response = "In your last lesson, you covered basic bowing techniques and the Sa-Ri-Ga notes. Your mentor noted that your rhythm is improving, but you should keep practicing the transitions to make them smoother.";
+        } else if (action === "Explain my next milestone") {
+          response = "Your next milestone is 'Simple Rhythms'. This involves playing basic patterns consistently at 60 BPM. You're already 60% of the way there!";
+        } else if (action === "Motivate me for practice") {
+          response = "You've completed 2 milestones this week — great consistency! Remember, even 15 minutes of slow, clean practice today will make a huge difference. You've got this!";
+        } else if (action === "Show my latest materials") {
+          response = "Your mentor uploaded a 'Bowing Exercise PDF' and a 'Practice Guide' for your current stage. You can find them in the Growth tab!";
+        } else if (action === "What should I review before class?") {
+          response = "Before your next class with Cikgu Aris, review the 'Bowing Exercise PDF' and practice the Sa-Ri-Ga transitions at a slow tempo.";
+        } else if (action === "Create a 15-minute practice routine") {
+          response = "Here's a quick 15-minute routine: \n1. 3 mins: Open string bowing (focus on straight bow)\n2. 7 mins: Sa-Ri-Ga transitions (slow and clean)\n3. 5 mins: Review the 'Simple Rhythms' patterns.";
+        } else {
+          response = "I'm here to help you with your music journey! You can ask me about your practice, lessons, or materials.";
+        }
+      } else {
+        // Mentor logic
+        if (action === "Suggest a lesson summary") {
+          response = "Based on the session notes, I suggest: 'Today we focused on advanced bowing and complex rhythmic patterns. Student showed great improvement in Sa-Ri-Ga transitions but needs more work on 4-beat cycles.'";
+        } else if (action === "Draft a practice plan for Sarah") {
+          response = "Practice Plan for Sarah: 1. 5 min warm-up (Sa-Ri-Ga), 2. 10 min bow control exercise (4-beat cycles), 3. 5 min review of Lesson 3 patterns.";
+        } else if (action === "Analyze Marcus's progress") {
+          response = "Marcus has been consistent with his practice logs. He's currently at 80% completion for 'Rhythm Stability'. He might be ready for 'Advanced Scales' next week.";
+        } else if (action === "Recommend materials for next lesson") {
+          response = "For the next lesson on 'Advanced Scales', I recommend sharing the 'Scale Mastery PDF' and the 'Finger Placement Video'.";
+        } else if (action === "Draft an encouraging note") {
+          response = "Encouraging Note: 'Great job on mastering the basic striking! Your dedication is really showing. Let's keep this momentum going into the next stage!'";
+        } else {
+          response = "I'm your mentor assistant. I can help you draft summaries, plans, or analyze student progress.";
+        }
+      }
+      
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      setIsAiBuddyTyping(false);
+    }, 1500);
+  };
 
   return (
     <div className={`h-screen font-sans transition-colors duration-500 overflow-hidden ${isDark ? 'bg-black text-white' : 'bg-white text-zinc-900'}`}>
@@ -4751,7 +5921,7 @@ export default function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.3 }}
-              className="flex-1 overflow-y-auto scrollbar-hide pb-32"
+              className="flex-1 overflow-y-auto scrollbar-hide pb-24"
             >
               {view === 'home' && HomeView()}
               {view === 'full-schedule' && FullScheduleView()}
@@ -4765,8 +5935,8 @@ export default function App() {
           </AnimatePresence>
 
           {/* Mobile Nav */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%]">
-            <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-2 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
+            <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
                 { id: 'home', icon: HomeIcon, label: 'Home' },
                 { id: 'students', icon: Users, label: 'Students' },
@@ -4800,6 +5970,57 @@ export default function App() {
           </div>
         </>
       )}
+
+      <BottomSheet 
+        isOpen={showNotificationSheet} 
+        onClose={() => setShowNotificationSheet(false)}
+        title="Notifications"
+      >
+        <div className="px-6 pb-10">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Recent Activity</h3>
+            <button 
+              onClick={async () => {
+                const unreadNotifs = notifications.filter(n => !n.read);
+                for (const notif of unreadNotifs) {
+                  try {
+                    await updateDoc(doc(db, 'notifications', notif.id), { read: true });
+                  } catch (error) {
+                    console.error("Error marking notification as read:", error);
+                  }
+                }
+              }}
+              className="text-[10px] font-bold text-harbour-400 uppercase tracking-widest"
+            >
+              Mark all as read
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {notifications.length > 0 ? (
+              notifications.map((notif) => (
+                <div 
+                  key={notif.id} 
+                  className={`p-4 rounded-2xl border transition-all ${notif.read ? 'bg-white/5 border-white/5 opacity-60' : 'bg-white/10 border-white/10 shadow-lg shadow-harbour-500/5'}`}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className={`text-sm font-bold ${notif.read ? 'text-white/60' : 'text-white'}`}>{notif.title}</h4>
+                    <span className="text-[8px] font-mono text-white/30">{notif.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p className={`text-xs leading-relaxed ${notif.read ? 'text-white/40' : 'text-white/70'}`}>{notif.body}</p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10">
+                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Bell size={20} className="text-white/20" />
+                </div>
+                <p className="text-sm text-white/40">No new notifications</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </BottomSheet>
 
       {/* Global Bottom Sheets */}
       <BottomSheet 
@@ -5155,6 +6376,54 @@ export default function App() {
           )}
         </div>
       </BottomSheet>
+
+      {/* AI Buddy Floating Button - Restricted to 4 Main Navigation Pages */}
+      {isAuth && (
+        (() => {
+          const showOnMentorViews = ['home', 'students', 'messages', 'profile'];
+          const showOnStudentViews = ['home', 'journey', 'messages', 'profile'];
+          
+          const shouldShow = isStudent 
+            ? showOnStudentViews.includes(studentView)
+            : showOnMentorViews.includes(view);
+
+          if (!shouldShow) return null;
+
+          return (
+            <>
+              <motion.button 
+                initial={{ scale: 0, opacity: 0, x: 20 }}
+                animate={{ scale: 1, opacity: 1, x: 0 }}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowAIBuddySheet(true)}
+                className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-[0_0_30px_rgba(212,175,55,0.3)] z-[100] overflow-hidden group border-2 border-harbour-500"
+              >
+                {/* Solid Black Background */}
+                <div className="absolute inset-0 bg-black" />
+                
+                {/* Harbour Glow Accent */}
+                <div className="absolute inset-0 bg-gradient-to-br from-harbour-500/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+                
+                <div className="relative z-10 flex items-center justify-center">
+                  <div className="w-9 h-9 bg-harbour-500 rounded-xl flex items-center justify-center text-black shadow-lg shadow-harbour-500/20 group-hover:scale-110 transition-transform">
+                    <Bot size={20} />
+                  </div>
+                </div>
+
+                {/* Pulsing Status Dot */}
+                <motion.div 
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute top-3 right-3 w-1.5 h-1.5 bg-harbour-400 rounded-full shadow-[0_0_8px_rgba(212,175,55,0.8)]"
+                />
+              </motion.button>
+
+              <AIBuddySheet />
+            </>
+          );
+        })()
+      )}
       </div>
     </div>
   );
