@@ -216,8 +216,6 @@ interface Student {
   stage: string;
   lessonsRemaining: number;
   lastLesson: string;
-  lastSession?: string;
-  nextSession?: string;
   package: 'Trial' | 'Single' | 'Package 8' | 'Package 12' | 'Monthly';
   photo: string;
   progress: number;
@@ -275,9 +273,6 @@ interface Transaction {
   grossAmount: number;
   platformFee: number;
   netAmount: number;
-  isPartOfPackage?: boolean;
-  completedAt?: any;
-  status?: string;
 }
 
 interface Withdrawal {
@@ -321,8 +316,6 @@ const MOCK_STUDENTS: Student[] = [
     stage: 'Stage 2 — Developing', 
     lessonsRemaining: 4, 
     lastLesson: '2024-03-12', 
-    lastSession: '2 days ago',
-    nextSession: 'Tomorrow, 4:00 PM',
     package: 'Package 8', 
     photo: 'https://picsum.photos/seed/woman5/200', 
     progress: 45,
@@ -344,8 +337,6 @@ const MOCK_STUDENTS: Student[] = [
     stage: 'Stage 3 — Progressing', 
     lessonsRemaining: 1, 
     lastLesson: '2024-03-14', 
-    lastSession: 'Yesterday',
-    nextSession: 'Thursday, 5:30 PM',
     package: 'Single', 
     photo: 'https://picsum.photos/seed/man9/200', 
     progress: 75, 
@@ -366,8 +357,6 @@ const MOCK_STUDENTS: Student[] = [
     stage: 'Stage 1 — Foundation', 
     lessonsRemaining: 12, 
     lastLesson: '2024-03-10', 
-    lastSession: '1 week ago',
-    nextSession: 'Saturday, 10:00 AM',
     package: 'Monthly', 
     photo: 'https://picsum.photos/seed/woman6/200', 
     progress: 15, 
@@ -425,25 +414,6 @@ const MOCK_STUDENTS: Student[] = [
     aboutMe: "Fascinated by Indian rhythms.",
     learningPath: []
   },
-  { 
-    id: 's7', 
-    name: 'Zhi Wei', 
-    email: 'zhi.w@example.com',
-    instrument: 'Pipa', 
-    stage: 'Stage 3 — Progressing', 
-    lessonsRemaining: 3, 
-    lastLesson: '2024-03-20', 
-    package: 'Package 12', 
-    photo: 'https://picsum.photos/seed/man18/200', 
-    progress: 65, 
-    totalLessons: 12,
-    aboutMe: "I've been playing Pipa for a few years and want to improve my speed and precision.",
-    learningPath: [
-      { id: 'm1', title: 'Stage 1 — Foundation', status: 'completed', description: 'Basic plucking, Tuning, Simple melodies' },
-      { id: 'm2', title: 'Stage 2 — Developing', status: 'completed', description: 'Intermediate techniques, Traditional songs' },
-      { id: 'm3', title: 'Stage 3 — Progressing', status: 'current', description: 'Advanced techniques, Complex rhythms' },
-    ]
-  }
 ];
 
 const MOCK_SESSION_LOGS: SessionLog[] = [
@@ -2113,61 +2083,8 @@ export default function App() {
   const handleSendMessage = async (text: string) => {
     if (!currentUser || !selectedChat || !text.trim()) return;
 
-    let conversationId = selectedChat.conversationId;
+    const conversationId = selectedChat.conversationId || selectedChat.id;
     const trimmedText = text.trim();
-
-    // If it's a new conversation, we need to create it first
-    if (!conversationId) {
-      try {
-        const otherParticipantId = selectedChat.recipientId;
-        if (!otherParticipantId) return;
-
-        // Check if conversation already exists (double check)
-        const existingConv = conversations.find(c => c.participants.includes(otherParticipantId));
-        if (existingConv) {
-          conversationId = existingConv.id;
-        } else {
-          // Create new conversation
-          const participants = [currentUser.uid, otherParticipantId];
-          const participantDetails: any = {};
-          
-          // Current user details
-          const myProfile = isStudent ? studentProfile : mentorProfile;
-          participantDetails[currentUser.uid] = {
-            name: myProfile.name || 'User',
-            photo: myProfile.photo || null,
-            role: isStudent ? 'Student' : 'Mentor'
-          };
-
-          // Other participant details
-          participantDetails[otherParticipantId] = {
-            name: selectedChat.name,
-            photo: selectedChat.photo,
-            role: selectedChat.role || (isStudent ? 'Mentor' : 'Student')
-          };
-
-          const newConvRef = await addDoc(collection(db, 'conversations'), {
-            participants,
-            participantDetails,
-            lastMessage: trimmedText,
-            lastMessageAt: serverTimestamp(),
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-          conversationId = newConvRef.id;
-          
-          // Update selectedChat so subsequent messages use the new ID
-          setSelectedChat({
-            ...selectedChat,
-            conversationId: conversationId,
-            id: conversationId
-          });
-        }
-      } catch (error) {
-        console.error("Error creating conversation:", error);
-        return;
-      }
-    }
 
     // Optimistic UI update
     const optimisticMessage = {
@@ -2421,19 +2338,7 @@ export default function App() {
   ) => {
     if (!currentUser || !selectedMentor) return;
     
-    // Capitalize type for Bug 2
-    const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
-    
     try {
-      const isPartOfPackage = type === 'package';
-      const price = type === 'trial' ? 0 : 
-                   type === 'single' ? selectedMentor.pricePerLesson : 
-                   selectedPackage?.price || 0;
-      const totalLessons = type === 'package' ? selectedPackage?.lessons : 1;
-      const walletCredit = isPartOfPackage 
-        ? (price / (totalLessons || 1)) 
-        : price;
-
       await addDoc(collection(db, 'lessons'), {
         studentId: currentUser.uid,
         studentName: userProfile?.name || currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
@@ -2442,13 +2347,11 @@ export default function App() {
         instrument: selectedMentor.specialisation[0] || '',
         date: bookingDate || '',
         time: bookingTime || '',
-        type: capitalizedType,
+        type: type,
         status: 'pending',
-        price: price,
-        // Bug 4: Save totalLessons for packages
-        totalLessons: totalLessons,
-        walletCredit,
-        isPartOfPackage,
+        price: type === 'trial' ? 0 : 
+               type === 'single' ? 60 : 
+               selectedPackage?.price || 0,
         studentNote: bookingNote || '',
         lessonNumber: 1,
         createdAt: serverTimestamp()
@@ -2482,20 +2385,9 @@ export default function App() {
 
       await addDoc(collection(db, 'sessionLogs'), logData);
 
-      // Bug 4: Calculate walletCredit and isPartOfPackage
-      const isPartOfPackage = selectedLesson.type === 'Package';
-      const walletCredit = isPartOfPackage 
-        ? (selectedLesson.price / (selectedLesson.totalLessons || 1)) 
-        : selectedLesson.price;
-
       // Update lesson status to completed
       await updateDoc(doc(db, 'lessons', selectedLesson.id), {
-        status: 'completed',
-        studentName: selectedStudent.name,
-        price: selectedLesson.price,
-        completedAt: serverTimestamp(),
-        walletCredit,
-        isPartOfPackage
+        status: 'completed'
       });
 
       // Trigger notifications
@@ -2596,35 +2488,28 @@ export default function App() {
     
     const q = query(
       collection(db, 'lessons'),
-      where('mentorId', '==', currentUser.uid)
+      where('mentorId', '==', currentUser.uid),
+      where('status', '==', 'completed')
     );
     
     const unsub = onSnapshot(q, (snap) => {
       const lessons = snap.docs.map(d => d.data());
-      // Include all lessons in balance as requested
       const total = lessons.reduce((sum, l) => 
-        sum + (l.walletCredit ?? l.price ?? 0), 0);
+        sum + (l.price || 0), 0);
       const platformFee = total * 0.1;
       setRealBalance(total - platformFee);
       setRealTransactions(
-        snap.docs.map(d => {
-          const data = d.data();
-          const amount = data.walletCredit ?? data.price ?? 0;
-          return {
-            id: d.id,
-            studentName: data.studentName,
-            date: data.date,
-            grossAmount: amount,
-            platformFee: amount * 0.1,
-            netAmount: amount * 0.9,
-            lessonType: data.type,
-            studentPhoto: '',
-            studentId: data.studentId,
-            isPartOfPackage: data.isPartOfPackage,
-            completedAt: data.completedAt,
-            status: data.status // Add status for UI
-          };
-        })
+        snap.docs.map(d => ({
+          id: d.id,
+          studentName: d.data().studentName,
+          date: d.data().date,
+          grossAmount: d.data().price,
+          platformFee: d.data().price * 0.1,
+          netAmount: d.data().price * 0.9,
+          lessonType: d.data().type,
+          studentPhoto: '',
+          studentId: d.data().studentId
+        }))
       );
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'lessons (mentor balance)');
@@ -2680,7 +2565,6 @@ export default function App() {
   const [showAIBuddySheet, setShowAIBuddySheet] = useState(false);
   const [aiBuddyMessages, setAiBuddyMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const [isAiBuddyTyping, setIsAiBuddyTyping] = useState(false);
-  const [aiBuddyInput, setAiBuddyInput] = useState('');
   const [bookingDate, setBookingDate] = useState<string | null>(null);
   const [bookingTime, setBookingTime] = useState<string | null>(null);
   const [bookingNote, setBookingNote] = useState('');
@@ -2773,7 +2657,6 @@ export default function App() {
   }, [authView]);
 
   // Chat and Profile States
-  const [chatNewMessage, setChatNewMessage] = useState('');
   const [studentBio, setStudentBio] = useState("Traditional music enthusiast learning the strings of Malaysia.");
   const [isEditingStudentBio, setIsEditingStudentBio] = useState(false);
   const [studentNotificationsEnabled, setStudentNotificationsEnabled] = useState(true);
@@ -3809,26 +3692,13 @@ export default function App() {
 
                   <div className="flex gap-3">
                     <button 
-                      onClick={() => {
-                        setSelectedChat({
-                          id: `new-${mentor.id}`,
-                          conversationId: null,
-                          name: mentor.name,
-                          photo: mentor.photo,
-                          role: 'Mentor',
-                          recipientId: mentor.id
-                        });
-                        switchStudentTab('messages');
-                      }}
+                      onClick={() => setShowRescheduleModal(true)}
                       className="flex-1 py-4 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full shadow-lg shadow-black/10 transition-transform active:scale-95"
                     >
-                      Message Mentor
-                    </button>
-                    <button 
-                      onClick={() => setShowRescheduleModal(true)}
-                      className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95"
-                    >
                       Reschedule
+                    </button>
+                    <button className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95">
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -4102,6 +3972,8 @@ export default function App() {
 
   const ChatConversation = ({ recipient, onBack, dark = true }: { recipient: any, onBack: () => void, dark?: boolean }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [localMessage, setLocalMessage] = useState('');
 
     useEffect(() => {
       if (scrollRef.current) {
@@ -4110,9 +3982,10 @@ export default function App() {
     }, [messages]);
 
     const handleSend = async () => {
-      if (!chatNewMessage.trim()) return;
-      const text = chatNewMessage;
-      setChatNewMessage(''); // Clear input immediately
+      if (!localMessage.trim()) return;
+      const text = localMessage;
+      setLocalMessage('');
+      setTimeout(() => inputRef.current?.focus(), 0);
       await handleSendMessage(text);
     };
 
@@ -4160,10 +4033,10 @@ export default function App() {
         <div className={`p-5 pb-10 border-t ${dark ? 'border-white/10' : 'border-zinc-100'}`}>
           <div className="relative">
             <input 
-              value={chatNewMessage}
-              onChange={(e) => setChatNewMessage(e.target.value)}
+              ref={inputRef}
+              value={localMessage}
+              onChange={(e) => setLocalMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              onFocus={(e) => e.stopPropagation()}
               placeholder="Type a message..."
               className={`w-full py-4 pl-6 pr-14 rounded-full text-xs focus:outline-none ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`}
             />
@@ -4187,39 +4060,11 @@ export default function App() {
       return <ChatConversation recipient={selectedChat} onBack={() => setSelectedChat(null)} dark={dark} />;
     }
 
-    const bookedMentors = studentLessons.reduce((acc: any[], lesson) => {
-      if (!acc.find(m => m.id === lesson.mentorId)) {
-        acc.push({
-          id: lesson.mentorId,
-          name: lesson.mentorName,
-          photo: null, // We'll try to find the photo from realMentors or MOCK_MENTORS
-          role: 'Mentor'
-        });
-      }
-      return acc;
-    }, []);
-
-    const mentorsToDisplay = bookedMentors.map(m => {
-      const mentorDetails = realMentors.find(rm => rm.id === m.id) || MOCK_MENTORS.find(mm => mm.id === m.id);
-      return {
-        ...m,
-        photo: mentorDetails?.photo || null
-      };
-    });
-
-    const mentorsWithoutChat = mentorsToDisplay.filter(m => {
-      return !conversations.some(conv => conv.participants.includes(m.id));
-    });
-
     const filteredConversations = conversations.filter(conv => {
       const otherParticipantId = conv.participants.find((p: string) => p !== currentUser?.uid);
       const details = conv.participantDetails[otherParticipantId];
       return details?.name?.toLowerCase().includes(searchQuery.toLowerCase());
     });
-
-    const filteredMentorsWithoutChat = mentorsWithoutChat.filter(m => 
-      m.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
 
     return (
       <div className={`h-full flex flex-col pt-16 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'}`}>
@@ -4237,95 +4082,59 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 space-y-6 pb-32">
-          {filteredMentorsWithoutChat.length > 0 && (
-            <section className="space-y-3">
-              <h2 className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Your Mentors</h2>
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                {filteredMentorsWithoutChat.map(mentor => (
-                  <motion.div
-                    key={mentor.id}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedChat({
-                      id: `new-${mentor.id}`,
-                      conversationId: null,
-                      name: mentor.name,
-                      photo: mentor.photo,
-                      role: mentor.role,
-                      recipientId: mentor.id
-                    })}
-                    className="flex flex-col items-center gap-2 min-w-[80px]"
-                  >
-                    <div className="relative">
-                      <Avatar name={mentor.name} photo={mentor.photo} size="lg" className="rounded-2xl border-2 border-harbour-500/20" />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-harbour-500 rounded-full flex items-center justify-center border-2 border-atmospheric-dark">
-                        <Plus size={10} className="text-white" />
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold truncate w-full text-center">{mentor.name.split(' ')[0]}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="space-y-3">
-            <h2 className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>Recent Chats</h2>
-            {filteredConversations.length === 0 && filteredMentorsWithoutChat.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center px-10 py-20 relative">
-                <div className="absolute inset-0 bg-harbour-500/5 blur-[100px] rounded-full" />
-                <div className="relative z-10">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 mx-auto ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
-                    <MessageSquare size={32} className={dark ? 'text-white/20' : 'text-zinc-300'} />
-                  </div>
-                  <h3 className="text-lg font-serif-sturdy mb-2">No messages yet</h3>
-                  <p className={`text-xs leading-relaxed ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
-                    {searchQuery ? "We couldn't find any mentors matching your search." : "Your musical journey starts with a conversation. Reach out to a mentor to begin."}
-                  </p>
+        <div className="flex-1 overflow-y-auto px-5 space-y-3 pb-32">
+          {filteredConversations.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-10 relative">
+              <div className="absolute inset-0 bg-harbour-500/5 blur-[100px] rounded-full" />
+              <div className="relative z-10">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 mx-auto ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
+                  <MessageSquare size={32} className={dark ? 'text-white/20' : 'text-zinc-300'} />
                 </div>
+                <h3 className="text-lg font-serif-sturdy mb-2">No messages yet</h3>
+                <p className={`text-xs leading-relaxed ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
+                  {searchQuery ? "We couldn't find any mentors matching your search." : "Your musical journey starts with a conversation. Reach out to a mentor to begin."}
+                </p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredConversations.map((conv) => {
-                  const otherParticipantId = conv.participants.find((p: string) => p !== currentUser?.uid);
-                  const details = conv.participantDetails[otherParticipantId];
-                  
-                  return (
-                    <motion.div 
-                      key={conv.id} 
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setSelectedChat({
-                        id: conv.id,
-                        conversationId: conv.id,
-                        name: details.name,
-                        photo: details.photo,
-                        role: details.role
-                      })}
-                      className={`p-4 rounded-3xl border transition-all cursor-pointer ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:border-zinc-200'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <img src={details.photo || null} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+            </div>
+          ) : (
+            filteredConversations.map((conv) => {
+              const otherParticipantId = conv.participants.find((p: string) => p !== currentUser?.uid);
+              const details = conv.participantDetails[otherParticipantId];
+              
+              return (
+                <motion.div 
+                  key={conv.id} 
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedChat({
+                    id: conv.id,
+                    conversationId: conv.id,
+                    name: details.name,
+                    photo: details.photo,
+                    role: details.role
+                  })}
+                  className={`p-4 rounded-3xl border transition-all cursor-pointer ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:border-zinc-200'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <img src={details.photo || null} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold truncate">{details.name}</h3>
+                          <span className="px-1.5 py-0.5 bg-harbour-500/10 text-harbour-400 text-[7px] font-bold rounded uppercase tracking-widest">{details.role}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start mb-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-bold truncate">{details.name}</h3>
-                              <span className="px-1.5 py-0.5 bg-harbour-500/10 text-harbour-400 text-[7px] font-bold rounded uppercase tracking-widest">{details.role}</span>
-                            </div>
-                            <span className={`text-[8px] font-mono ${dark ? 'text-white/30' : 'text-zinc-400'}`}>
-                              {conv.lastMessageAt?.toDate ? conv.lastMessageAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </span>
-                          </div>
-                          <p className={`text-[11px] truncate ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{conv.lastMessage || ''}</p>
-                        </div>
+                        <span className={`text-[8px] font-mono ${dark ? 'text-white/30' : 'text-zinc-400'}`}>
+                          {conv.lastMessageAt?.toDate ? conv.lastMessageAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
                       </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+                      <p className={`text-[11px] truncate ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{conv.lastMessage || ''}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
         </div>
       </div>
     );
@@ -5946,39 +5755,9 @@ export default function App() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3 py-3 border-y border-zinc-50">
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Last Session</p>
-                      <p className="text-[10px] font-medium text-zinc-600">{student.lastSession || 'None'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Next Session</p>
-                      <p className="text-[10px] font-bold text-harbour-600">{student.nextSession || 'Not scheduled'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-2">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-zinc-900">{student.package}</span>
-                      <span className="text-[9px] font-medium text-zinc-400">{student.lessonsRemaining} lessons left</span>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedChat({
-                          id: `new-${student.id}`,
-                          conversationId: null,
-                          name: student.name,
-                          photo: student.photo,
-                          role: 'Student',
-                          recipientId: student.id
-                        });
-                        setView('messages');
-                      }}
-                      className="w-10 h-10 rounded-full bg-zinc-900 text-white flex items-center justify-center shadow-lg shadow-black/10 transition-transform active:scale-90"
-                    >
-                      <MessageSquare size={16} />
-                    </button>
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-50">
+                    <span className="text-[10px] font-bold text-zinc-400">{student.package}</span>
+                    <span className="text-[10px] font-bold text-harbour-600">{student.lessonsRemaining} lessons left</span>
                   </div>
                 </div>
               </motion.div>
@@ -6207,48 +5986,36 @@ export default function App() {
                         </div>
                       </div>
                     ) : (
-                      filteredTransactions.map(t => {
-                        const capitalizedType = t.lessonType.charAt(0).toUpperCase() + t.lessonType.slice(1);
-                        const displayDate = t.date || (t.completedAt?.toDate ? t.completedAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-                        
-                        return (
-                          <div key={t.id} className="bg-white border border-zinc-100 p-4 rounded-2xl shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <Avatar name={t.studentName || 'Student'} photo={t.studentPhoto} size="sm" className="rounded-xl" />
-                                <div>
-                                  <p className="text-[11px] font-bold text-zinc-900">{t.studentName || 'Student'}</p>
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-[9px] text-zinc-400">{new Date(displayDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {capitalizedType}</p>
-                                    {t.isPartOfPackage && (
-                                      <span className="bg-zinc-100 text-zinc-400 px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest">Part of package</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-bold text-zinc-900">+RM {t.netAmount.toFixed(2)}</p>
-                                <p className="text-[8px] text-zinc-400">Net after fee</p>
+                      filteredTransactions.map(t => (
+                        <div key={t.id} className="bg-white border border-zinc-100 p-4 rounded-2xl shadow-sm">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={t.studentName} photo={t.studentPhoto} size="sm" className="rounded-xl" />
+                              <div>
+                                <p className="text-[11px] font-bold text-zinc-900">{t.studentName}</p>
+                                <p className="text-[9px] text-zinc-400">{new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {t.lessonType}</p>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between pt-3 border-t border-zinc-50">
-                              <div className="flex gap-4">
-                                <div className="flex flex-col">
-                                  <span className="text-[8px] uppercase tracking-widest text-zinc-300 font-bold">Gross</span>
-                                  <span className="text-[10px] font-mono text-zinc-500">RM {t.grossAmount.toFixed(2)}</span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[8px] uppercase tracking-widest text-zinc-300 font-bold">Fee</span>
-                                  <span className="text-[10px] font-mono text-zinc-500">-RM {t.platformFee.toFixed(2)}</span>
-                                </div>
-                              </div>
-                              <Badge variant={t.status === 'completed' ? 'default' : 'outline'}>
-                                {t.status ? t.status.charAt(0).toUpperCase() + t.status.slice(1) : 'Completed'}
-                              </Badge>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-zinc-900">+RM {t.netAmount.toFixed(2)}</p>
+                              <p className="text-[8px] text-zinc-400">Net after fee</p>
                             </div>
                           </div>
-                        );
-                      })
+                          <div className="flex items-center justify-between pt-3 border-t border-zinc-50">
+                            <div className="flex gap-4">
+                              <div className="flex flex-col">
+                                <span className="text-[8px] uppercase tracking-widest text-zinc-300 font-bold">Gross</span>
+                                <span className="text-[10px] font-mono text-zinc-500">RM {t.grossAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[8px] uppercase tracking-widest text-zinc-300 font-bold">Fee</span>
+                                <span className="text-[10px] font-mono text-zinc-500">-RM {t.platformFee.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <Badge variant="outline">Completed</Badge>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 );
@@ -7256,24 +7023,61 @@ export default function App() {
     const handleAIGenerate = async () => {
       if (!aiBrainDump) return;
       setIsGenerating(true);
-      
-      // Simulate AI processing the brain dump
-      setTimeout(() => {
-        const sentences = aiBrainDump.split('.').filter(s => s.trim().length > 0);
-        const coveredText = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
-        const focusText = sentences.slice(Math.ceil(sentences.length / 2)).join('. ') + '.';
-        
-        setSessionCovered(coveredText || "Focused on " + selectedStudent.instrument + " techniques discussed today.");
-        setSessionFocus(focusText || "Continue practicing the exercises from today's lesson.");
-        
-        if (aiBrainDump.length > 50 && selectedStudent.learningPath && selectedStudent.learningPath.length > 0) {
-          setSelectedMilestones([selectedStudent.learningPath[0].id]);
+
+      const studentName = selectedStudent.name;
+      const instrument = selectedStudent.instrument;
+      const stage = selectedStudent.stage;
+      const lessonNum = selectedLesson?.lessonNumber || '?';
+      const milestones = selectedStudent.learningPath?.map(m => m.title).join(', ') || 'none';
+
+      const systemPrompt = `You are a teaching assistant helping a music mentor in NADA, a Malaysian traditional music app. 
+The mentor has given you a rough brain dump of a lesson. Extract and structure it into two parts:
+1. "covered" — what was covered in the lesson (2–3 sentences, past tense)
+2. "focus" — what the student should focus on next (1–2 sentences, actionable)
+
+Student: ${studentName} | Instrument: ${instrument} | Stage: ${stage} | Lesson #${lessonNum}
+Known milestones: ${milestones}
+
+Respond ONLY with a JSON object like this, no other text:
+{"covered": "...", "focus": "..."}`;
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: aiBrainDump }],
+          }),
+        });
+
+        if (!response.ok) throw new Error(`API error ${response.status}`);
+        const data = await response.json();
+        const raw = data.content?.[0]?.text || '';
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+
+        setSessionCovered(parsed.covered || '');
+        setSessionFocus(parsed.focus || '');
+
+        // Auto-tick first in-progress milestone if any
+        if (selectedStudent.learningPath && selectedStudent.learningPath.length > 0) {
+          const current = selectedStudent.learningPath.find(m => m.status === 'current');
+          if (current) setSelectedMilestones([current.id]);
         }
-        
+      } catch (err) {
+        console.error('AI Generate error:', err);
+        // Graceful fallback: split brain dump roughly
+        const sentences = aiBrainDump.split('.').filter(s => s.trim().length > 0);
+        setSessionCovered(sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.');
+        setSessionFocus(sentences.slice(Math.ceil(sentences.length / 2)).join('. ') + '.');
+      } finally {
         setIsGenerating(false);
         setShowAIGenerateSheet(false);
         setAiBrainDump('');
-      }, 1500);
+      }
     };
 
     const handleSave = () => {
@@ -7943,6 +7747,21 @@ export default function App() {
   // --- Main Render ---
 
   const AIBuddySheet = () => {
+    const [localAiInput, setLocalAiInput] = useState('');
+    const aiInputRef = useRef<HTMLInputElement>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [aiBuddyMessages, isAiBuddyTyping]);
+
+    const handleLocalSend = (text: string) => {
+      if (!text.trim()) return;
+      setLocalAiInput('');
+      setTimeout(() => aiInputRef.current?.focus(), 0);
+      handleAIBuddyAction(text);
+    };
+
     const studentPrompts = [
       "What should I practice today?",
       "Summarize my last lesson",
@@ -8030,7 +7849,7 @@ export default function App() {
                   ])).map((action) => (
                     <button 
                       key={action.label}
-                      onClick={() => handleAIBuddyAction(action.prompt || action.label)}
+                      onClick={() => handleLocalSend(action.prompt || action.label)}
                       className="flex items-center gap-4 p-4 bg-white border border-zinc-100 rounded-2xl hover:border-harbour-500 hover:shadow-lg hover:shadow-harbour-500/5 transition-all group"
                     >
                       <div className="p-2 bg-zinc-50 rounded-xl text-zinc-400 group-hover:text-harbour-500 transition-colors">
@@ -8071,6 +7890,7 @@ export default function App() {
                 </div>
               </div>
             )}
+            <div ref={chatEndRef} />
           </div>
 
           {/* Quick Actions - Professional Tags */}
@@ -8083,7 +7903,7 @@ export default function App() {
               {prompts.map((prompt) => (
                 <button 
                   key={prompt}
-                  onClick={() => handleAIBuddyAction(prompt)}
+                  onClick={() => handleLocalSend(prompt)}
                   className="flex-shrink-0 px-4 py-2.5 bg-zinc-50 border border-zinc-100 rounded-xl text-[10px] font-bold text-zinc-600 hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all active:scale-95"
                 >
                   {prompt}
@@ -8092,31 +7912,24 @@ export default function App() {
             </div>
           </div>
 
-          {/* Input Area - Executive & Sleek */}
+          {/* Input Area */}
           <div className="p-5 bg-white border-t border-zinc-100">
             <div className="relative group">
               <input 
+                ref={aiInputRef}
                 type="text" 
-                value={aiBuddyInput}
-                onChange={(e) => setAiBuddyInput(e.target.value)}
-                onFocus={(e) => e.stopPropagation()}
+                value={localAiInput}
+                onChange={(e) => setLocalAiInput(e.target.value)}
                 placeholder={isStudent ? "Ask your music companion..." : "Ask your teaching assistant..."}
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4.5 pl-5 pr-14 text-sm focus:outline-none focus:border-zinc-900 focus:bg-white transition-all shadow-inner"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-zinc-900 focus:bg-white transition-all"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && aiBuddyInput.trim()) {
-                    handleAIBuddyAction(aiBuddyInput);
-                    setAiBuddyInput('');
-                  }
+                  if (e.key === 'Enter') handleLocalSend(localAiInput);
                 }}
               />
               <button 
-                onClick={() => {
-                  if (aiBuddyInput.trim()) {
-                    handleAIBuddyAction(aiBuddyInput);
-                    setAiBuddyInput('');
-                  }
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 bg-zinc-900 text-white rounded-xl flex items-center justify-center active:scale-90 transition-all shadow-xl shadow-zinc-900/20"
+                onClick={() => handleLocalSend(localAiInput)}
+                disabled={isAiBuddyTyping}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 bg-zinc-900 text-white rounded-xl flex items-center justify-center active:scale-90 transition-all shadow-xl shadow-zinc-900/20 disabled:opacity-40"
               >
                 <Send size={18} />
               </button>
@@ -8127,51 +7940,44 @@ export default function App() {
     );
   };
 
-  const handleAIBuddyAction = (action: string) => {
-    setAiBuddyMessages(prev => [...prev, { role: 'user', content: action }]);
+  const handleAIBuddyAction = async (action: string) => {
+    if (!action.trim()) return;
+    const newMessages = [...aiBuddyMessages, { role: 'user' as const, content: action }];
+    setAiBuddyMessages(newMessages);
     setIsAiBuddyTyping(true);
-    
-    // Simulate AI response
-    setTimeout(() => {
-      let response = "";
-      if (isStudent) {
-        if (action === "What should I practice today?") {
-          response = "Based on your last lesson with Cikgu Aris, you should focus on smooth bow control and clean transitions between Sa–Ri–Ga. I recommend a 20-minute session: 5 mins warm-up, 10 mins bowing exercise, and 5 mins slow note transitions.";
-        } else if (action === "Summarize my last lesson") {
-          response = "In your last lesson, you covered basic bowing techniques and the Sa-Ri-Ga notes. Your mentor noted that your rhythm is improving, but you should keep practicing the transitions to make them smoother.";
-        } else if (action === "Explain my next milestone") {
-          response = "Your next milestone is 'Simple Rhythms'. This involves playing basic patterns consistently at 60 BPM. You're already 60% of the way there!";
-        } else if (action === "Motivate me for practice") {
-          response = "You've completed 2 milestones this week — great consistency! Remember, even 15 minutes of slow, clean practice today will make a huge difference. You've got this!";
-        } else if (action === "Show my latest materials") {
-          response = "Your mentor uploaded a 'Bowing Exercise PDF' and a 'Practice Guide' for your current stage. You can find them in the Growth tab!";
-        } else if (action === "What should I review before class?") {
-          response = "Before your next class with Cikgu Aris, review the 'Bowing Exercise PDF' and practice the Sa-Ri-Ga transitions at a slow tempo.";
-        } else if (action === "Create a 15-minute practice routine") {
-          response = "Here's a quick 15-minute routine: \n1. 3 mins: Open string bowing (focus on straight bow)\n2. 7 mins: Sa-Ri-Ga transitions (slow and clean)\n3. 5 mins: Review the 'Simple Rhythms' patterns.";
-        } else {
-          response = "I'm here to help you with your music journey! You can ask me about your practice, lessons, or materials.";
-        }
-      } else {
-        // Mentor logic
-        if (action === "Suggest a lesson summary") {
-          response = "Based on the session notes, I suggest: 'Today we focused on advanced bowing and complex rhythmic patterns. Student showed great improvement in Sa-Ri-Ga transitions but needs more work on 4-beat cycles.'";
-        } else if (action === "Draft a practice plan for Sarah") {
-          response = "Practice Plan for Sarah: 1. 5 min warm-up (Sa-Ri-Ga), 2. 10 min bow control exercise (4-beat cycles), 3. 5 min review of Lesson 3 patterns.";
-        } else if (action === "Analyze Marcus's progress") {
-          response = "Marcus has been consistent with his practice logs. He's currently at 80% completion for 'Rhythm Stability'. He might be ready for 'Advanced Scales' next week.";
-        } else if (action === "Recommend materials for next lesson") {
-          response = "For the next lesson on 'Advanced Scales', I recommend sharing the 'Scale Mastery PDF' and the 'Finger Placement Video'.";
-        } else if (action === "Draft an encouraging note") {
-          response = "Encouraging Note: 'Great job on mastering the basic striking! Your dedication is really showing. Let's keep this momentum going into the next stage!'";
-        } else {
-          response = "I'm your mentor assistant. I can help you draft summaries, plans, or analyze student progress.";
-        }
-      }
-      
-      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: response }]);
+
+    // Build context about the current user for the AI
+    const userName = userProfile?.name || currentUser?.displayName || 'the user';
+    const instrument = userProfile?.instrument || studentActiveLesson?.instrument || 'a traditional Malaysian instrument';
+    const studentContext = isStudent
+      ? `You are a warm, encouraging music companion inside NADA — a Malaysian traditional music learning app. The student's name is ${userName} and they are learning ${instrument}. Keep responses concise (3–5 sentences max), practical, and motivating. Use simple, friendly language. Do not use markdown bold or headers — plain text only.`
+      : `You are a helpful teaching assistant inside NADA — a Malaysian traditional music mentoring app. The mentor's name is ${userName}. Their students include: ${realStudents.map(s => `${s.name} (${s.instrument}, ${s.stage})`).join(', ') || 'none yet'}. Keep responses concise, professional, and actionable. Do not use markdown bold or headers — plain text only.`;
+
+    // Build message history for multi-turn context
+    const historyMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: studentContext,
+          messages: historyMessages,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`API error ${response.status}`);
+      const data = await response.json();
+      const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding. Please try again.';
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (err) {
+      console.error('AI Buddy error:', err);
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not connect right now. Please check your internet and try again.' }]);
+    } finally {
       setIsAiBuddyTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -8345,8 +8151,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* Mobile Nav */}
-          {view !== 'student-detail' && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
                 { id: 'home', icon: HomeIcon, label: 'Home' },
@@ -8379,7 +8184,6 @@ export default function App() {
               ))}
             </div>
           </div>
-        )}
         </>
       )}
 
