@@ -1951,9 +1951,9 @@ export default function App() {
     return () => unsub();
   }, [currentUser, isStudent, userProfile]);
 
-  // Conversations Listener
+  // Conversations Listener (Fix 6: fires for both mentor and student)
   useEffect(() => {
-    if (!currentUser || !isStudent || !userProfile) return;
+    if (!currentUser || !userProfile) return;
     
     const q = query(
       collection(db, 'conversations'),
@@ -2041,6 +2041,7 @@ export default function App() {
       if (existingConv) {
         setSelectedChat({
           id: existingConv.id,
+          conversationId: existingConv.id,
           name: mentorName,
           photo: mentorPhoto,
           role: 'mentor'
@@ -2069,6 +2070,7 @@ export default function App() {
 
         setSelectedChat({
           id: newConv.id,
+          conversationId: newConv.id,
           name: mentorName,
           photo: mentorPhoto,
           role: 'mentor'
@@ -4015,7 +4017,7 @@ export default function App() {
           )}
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] p-4 rounded-2xl text-xs ${msg.isMe ? (dark ? 'bg-harbour-500 text-white rounded-tr-none' : 'bg-zinc-900 text-white rounded-tr-none') : (dark ? 'bg-white/10 text-white rounded-tl-none' : 'bg-zinc-100 text-zinc-900 rounded-tl-none')} ${msg.sending ? 'opacity-70' : ''}`}>
+              <div className={`max-w-[80%] p-4 rounded-2xl text-xs ${msg.isMe ? (dark ? 'bg-harbour-500 text-white rounded-tr-none' : 'bg-zinc-900 text-white rounded-tr-none') : (dark ? 'bg-zinc-700 text-white rounded-tl-none' : 'bg-zinc-100 text-zinc-900 rounded-tl-none')} ${msg.sending ? 'opacity-70' : ''}`}>
                 <p>{msg.text}</p>
                 <div className={`flex items-center gap-1 mt-1 opacity-50 ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
                   <p className="text-[8px]">
@@ -4038,7 +4040,7 @@ export default function App() {
               onChange={(e) => setLocalMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Type a message..."
-              className={`w-full py-4 pl-6 pr-14 rounded-full text-xs focus:outline-none ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`}
+              className={`w-full py-4 pl-6 pr-14 rounded-full text-xs focus:outline-none border ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder-white/40' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`}
             />
             <button 
               onClick={handleSend}
@@ -4057,7 +4059,7 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('');
     
     if (selectedChat) {
-      return <ChatConversation recipient={selectedChat} onBack={() => setSelectedChat(null)} dark={dark} />;
+      return <ChatConversation recipient={selectedChat} onBack={() => { setMessages([]); setSelectedChat(null); }} dark={dark} />;
     }
 
     const filteredConversations = conversations.filter(conv => {
@@ -4076,7 +4078,7 @@ export default function App() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={(e) => e.stopPropagation()}
-              className={`w-full border rounded-full pl-10 pr-4 py-3 text-xs focus:outline-none ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`} 
+              className={`w-full border rounded-full pl-10 pr-4 py-3 text-xs focus:outline-none ${dark ? 'bg-zinc-800 border-zinc-700 text-white placeholder-white/40' : 'bg-zinc-100 border-zinc-200 text-zinc-900'}`} 
               placeholder="Search mentors..." 
             />
           </div>
@@ -5707,7 +5709,7 @@ export default function App() {
         </div>
 
         {/* List */}
-        <div className="space-y-4">
+        <div className="space-y-2">
           {filteredStudents.map(student => {
             const stage = Math.min(Math.floor((student.progress || 0) / 25) + 1, 4);
             const stageColors = {
@@ -5722,43 +5724,31 @@ export default function App() {
                 key={student.id}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => { setSelectedStudent(student); setView('student-detail'); }}
-                className="bg-white border border-zinc-100 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md transition-all group"
+                className="bg-white border border-zinc-100 px-4 py-3 rounded-2xl shadow-sm hover:shadow-md transition-all group flex items-center gap-3"
               >
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="relative">
-                    <Avatar name={student.name} photo={student.photo} size="lg" className="rounded-2xl border-2 border-white shadow-sm" />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  <Avatar name={student.name} photo={student.photo} size="md" className="rounded-xl border border-zinc-100" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+                </div>
+                {/* Name + instrument + stage */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-sm font-bold text-zinc-900 group-hover:text-harbour-600 transition-colors truncate">{student.name}</h3>
+                    <Badge className={`border flex-shrink-0 ${stageColors[stage as keyof typeof stageColors]}`}>
+                      Stage {stage}
+                    </Badge>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-base font-bold text-zinc-900 group-hover:text-harbour-600 transition-colors">{student.name}</h3>
-                        <p className="text-[11px] text-zinc-500 font-medium">{student.instrument}</p>
-                      </div>
-                      <Badge className={`border ${stageColors[stage as keyof typeof stageColors]}`}>
-                        Stage {stage}
-                      </Badge>
-                    </div>
+                  <p className="text-[10px] text-zinc-400 font-medium truncate">{student.instrument} · {student.stage}</p>
+                  {/* Mini progress bar */}
+                  <div className="mt-1.5 h-1 w-full bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-harbour-400 to-harbour-500 rounded-full transition-all" style={{ width: `${student.progress}%` }} />
                   </div>
                 </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-end mb-1">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Progress</span>
-                    <span className="text-[10px] font-bold text-zinc-900">{student.progress}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${student.progress}%` }}
-                      className="h-full bg-gradient-to-r from-harbour-400 to-harbour-500 rounded-full"
-                    />
-                  </div>
-                  
-                  <div className="flex justify-between items-center pt-2 border-t border-zinc-50">
-                    <span className="text-[10px] font-bold text-zinc-400">{student.package}</span>
-                    <span className="text-[10px] font-bold text-harbour-600">{student.lessonsRemaining} lessons left</span>
-                  </div>
+                {/* Lessons remaining */}
+                <div className="flex-shrink-0 text-right">
+                  <p className="text-[10px] font-bold text-harbour-600 whitespace-nowrap">{student.lessonsRemaining} left</p>
+                  <p className="text-[9px] text-zinc-400">{student.package}</p>
                 </div>
               </motion.div>
             );
@@ -5771,10 +5761,56 @@ export default function App() {
   const MessagesView = () => {
     const [studentSearch, setStudentSearch] = useState('');
     if (selectedChat) {
-      return <ChatConversation recipient={selectedChat} onBack={() => setSelectedChat(null)} dark={true} />;
+      return <ChatConversation recipient={selectedChat} onBack={() => { setMessages([]); setSelectedChat(null); }} dark={true} />;
     }
 
-    const filteredStudents = realStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()));
+    // Fix 4: Only show students who have a lesson booked with this mentor
+    const bookedStudentIds = Array.from(new Set(lessons.map(l => l.studentId)));
+    const bookedStudents = (realStudents.length > 0 ? realStudents : MOCK_STUDENTS)
+      .filter(s => bookedStudentIds.includes(s.id))
+      .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()));
+
+    // Fix 4: handleMentorStartConversation - finds or creates conversation then opens chat
+    const handleMentorStartConversation = async (student: Student) => {
+      if (!currentUser) return;
+      try {
+        const q = query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', currentUser.uid)
+        );
+        const snap = await getDocs(q);
+        let existingConv = snap.docs.find(d => d.data().participants.includes(student.id));
+        if (existingConv) {
+          setSelectedChat({
+            id: existingConv.id,
+            conversationId: existingConv.id,
+            name: student.name,
+            photo: student.photo,
+            role: 'student'
+          });
+        } else {
+          const newConv = await addDoc(collection(db, 'conversations'), {
+            participants: [currentUser.uid, student.id],
+            participantDetails: {
+              [currentUser.uid]: { name: userProfile?.name || 'Mentor', photo: userProfile?.photo || '', role: 'mentor' },
+              [student.id]: { name: student.name, photo: student.photo || '', role: 'student' }
+            },
+            lastMessage: '',
+            lastMessageAt: serverTimestamp(),
+            createdAt: serverTimestamp()
+          });
+          setSelectedChat({
+            id: newConv.id,
+            conversationId: newConv.id,
+            name: student.name,
+            photo: student.photo,
+            role: 'student'
+          });
+        }
+      } catch (error) {
+        console.error("Error starting mentor conversation:", error);
+      }
+    };
 
     return (
       <div className="h-full flex flex-col pt-16 bg-atmospheric-dark text-white">
@@ -5782,17 +5818,18 @@ export default function App() {
           <h1 className="text-3xl font-serif-sturdy mb-6 text-white">Student Messages</h1>
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" size={14} />
+            {/* Fix 7: search input visible on dark bg */}
             <input 
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
-              className="w-full border rounded-full pl-10 pr-4 py-3 text-xs focus:outline-none bg-white/5 border-white/10 text-white" 
+              className="w-full border rounded-full pl-10 pr-4 py-3 text-xs focus:outline-none bg-zinc-800 border-zinc-700 text-white placeholder-white/40" 
               placeholder="Search students..." 
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 space-y-3 pb-32">
-          {filteredStudents.length === 0 ? (
+          {bookedStudents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 relative overflow-hidden rounded-3xl">
               <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/2 rounded-3xl" />
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
@@ -5800,15 +5837,15 @@ export default function App() {
               </div>
               <div className="text-center">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">No conversations yet</p>
-                <p className="text-[9px] text-white/15 mt-1">Messages from your students will appear here</p>
+                <p className="text-[9px] text-white/15 mt-1">Students who book a lesson will appear here</p>
               </div>
             </div>
           ) : (
-            filteredStudents.map((student, i) => (
+            bookedStudents.map((student, i) => (
               <motion.div 
                 key={student.id} 
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedChat(student)}
+                onClick={() => handleMentorStartConversation(student)}
                 className="p-4 rounded-3xl border transition-all cursor-pointer bg-white/5 border-white/10 hover:bg-white/10"
               >
                 <div className="flex items-center gap-4">
@@ -5822,10 +5859,9 @@ export default function App() {
                         <h3 className="text-sm font-bold truncate">{student.name}</h3>
                         <span className="px-1.5 py-0.5 text-[7px] font-bold rounded uppercase tracking-widest bg-white/10 text-white/40">Student</span>
                       </div>
-                      <span className="text-[8px] font-mono text-white/30">12:45 PM</span>
                     </div>
                     <p className="text-[9px] text-harbour-400 uppercase tracking-widest mb-1">{student.instrument}</p>
-                    <p className="text-[11px] truncate text-white/40">Thanks for the feedback! Looking forward to our next session.</p>
+                    <p className="text-[11px] truncate text-white/40">{student.stage}</p>
                   </div>
                 </div>
               </motion.div>
@@ -7921,7 +7957,7 @@ Respond ONLY with a JSON object like this, no other text:
                 value={localAiInput}
                 onChange={(e) => setLocalAiInput(e.target.value)}
                 placeholder={isStudent ? "Ask your music companion..." : "Ask your teaching assistant..."}
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-zinc-900 focus:bg-white transition-all"
+                className="w-full bg-white border-2 border-zinc-300 text-zinc-900 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-zinc-900 transition-all placeholder-zinc-400"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleLocalSend(localAiInput);
                 }}
