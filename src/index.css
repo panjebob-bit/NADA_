@@ -1,10 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Playfair+Display:wght@700;800&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
   --font-mono: "DM Mono", monospace;
+  --font-serif-sturdy: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-serif-curvy: "DM Serif Display", "Cormorant Garamond", Georgia, serif;
 
   --color-pine-500: #2A5040;
   --color-pine-600: #1E3D2F;
@@ -44,7 +46,13 @@
   --color-refraction-cyan: rgba(180, 210, 210, 0.3);
 
   /* Keep old colors for compatibility during transition if needed, but PDF says to map them */
+  --color-harbour-100: #d1f0e6;
+  --color-harbour-200: #a3e1cc;
+  --color-harbour-300: #6cccaf;
+  --color-harbour-400: #38b28e;
   --color-harbour-500: #1D9E75;
+  --color-harbour-600: #178060;
+  --color-harbour-700: #12624a;
   --color-walnut-500: #2A5040;
 }
 
@@ -56,6 +64,16 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
   }
+}
+
+.font-serif-sturdy {
+  font-family: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  font-weight: 700;
+}
+
+.font-serif-curvy {
+  font-family: "DM Serif Display", "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
 }
 
 /* Custom scrollbar for premium feel */

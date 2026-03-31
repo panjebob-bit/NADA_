@@ -2341,7 +2341,7 @@ export default function App() {
     try {
       await addDoc(collection(db, 'lessons'), {
         studentId: currentUser.uid,
-        studentName: currentUser.displayName || 'Student',
+        studentName: userProfile?.name || currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
         mentorId: selectedMentor.id,
         mentorName: selectedMentor.name,
         instrument: selectedMentor.specialisation[0] || '',
@@ -2767,7 +2767,7 @@ export default function App() {
                 className="group relative aspect-[2.4/1] rounded-[2rem] overflow-hidden cursor-pointer shadow-lg"
               >
                 <img 
-                  src={instrument.photo} 
+                  src={instrument.photo || null} 
                   alt={instrument.name} 
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                   referrerPolicy="no-referrer"
@@ -3262,7 +3262,7 @@ export default function App() {
             />
           ) : (
             <img 
-              src={coverImage}
+              src={coverImage || null}
               className="w-full h-full object-cover opacity-60" 
               referrerPolicy="no-referrer" 
             />
@@ -3468,7 +3468,7 @@ export default function App() {
                         )}
                         {section.id === 'gallery' && (
                           <div className="grid grid-cols-2 gap-2">
-                            {selectedMentor.gallery.map((img, i) => <img key={i} src={img} className="rounded-xl aspect-square object-cover" referrerPolicy="no-referrer" />)}
+                            {selectedMentor.gallery.map((img, i) => <img key={i} src={img || null} className="rounded-xl aspect-square object-cover" referrerPolicy="no-referrer" />)}
                           </div>
                         )}
                         {section.id === 'path' && (
@@ -3554,41 +3554,7 @@ export default function App() {
       </div>
     );
 
-    if (studentLessons.length > 0 && studentLogs.length === 0) {
-      const latest = studentLessons[0];
-      return (
-        <div className={`min-h-full px-5 pt-8 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
-          <h1 className={`text-3xl font-bold mb-6 ${dark ? 'text-white' : 'text-zinc-900'}`}>My Journey</h1>
-          <div className={`p-5 rounded-3xl border ${dark ? 'border-white/10 bg-white/5' : 'border-zinc-100 bg-white shadow-sm'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              {latest.status === 'pending' 
-                ? <Clock size={16} className="text-amber-500" />
-                : <CheckCircle2 size={16} className="text-green-500" />
-              }
-              <p className={`text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/30' : 'text-zinc-400'}`}>
-                {latest.status === 'pending' 
-                  ? 'Trial Pending' 
-                  : 'Trial Confirmed'}
-              </p>
-            </div>
-            <h3 className={`text-lg font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>
-              {latest.instrument}
-            </h3>
-            <p className={`text-sm ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
-              with {latest.mentorName}
-            </p>
-            <p className={`text-sm mt-1 ${dark ? 'text-white/30' : 'text-zinc-400'}`}>
-              {latest.date} at {latest.time}
-            </p>
-            {latest.status === 'pending' && (
-              <p className="text-xs text-amber-500 mt-3">
-                Waiting for mentor confirmation...
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
+    // Fall through to full journey view for all cases with lessons
 
     // Use the dynamic user profile
     const currentStudent = userProfile || MOCK_STUDENTS[0];
@@ -3624,14 +3590,15 @@ export default function App() {
       isLatest: index === 0
     })).sort((a, b) => b.id - a.id);
 
-    const roadmap = selectedInstrumentJourney === currentStudent.instrument 
-      ? (currentStudent.learningPath || [])
-      : (INSTRUMENT_STAGES[selectedInstrumentJourney] || []).map((stage, i) => ({
-          id: `m${i+1}`,
-          title: stage.title,
-          status: 'upcoming' as const,
-          description: stage.milestones.join(', ')
-        }));
+    const studentProfile_lp = (currentStudent as any)?.learningPath;
+    const hasLearningPath = Array.isArray(studentProfile_lp) && studentProfile_lp.length > 0;
+    const roadmap = hasLearningPath && selectedInstrumentJourney === currentStudent.instrument
+      ? studentProfile_lp
+      : (INSTRUMENT_STAGES[selectedInstrumentJourney] || []).map((stage, i) => {
+          const stageStatus = i < Math.floor(pastLessons.length / 3) ? 'completed'
+            : i === Math.floor(pastLessons.length / 3) ? 'current' : 'upcoming';
+          return { id: `m${i+1}`, title: stage.title, status: stageStatus, description: stage.milestones.join(', ') };
+        });
 
     const materials = MOCK_MATERIALS.filter(m => m.studentId === currentStudent.id);
 
@@ -3699,43 +3666,61 @@ export default function App() {
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Upcoming Session</h2>
               </div>
 
-              <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex gap-4 items-center">
-                    <Avatar name={mentor.name} photo={mentor.photo} size="md" className="rounded-xl shadow-md" />
-                    <div>
-                      <h3 className="font-serif text-lg text-zinc-900">{mentor.name}</h3>
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{selectedInstrumentJourney} • Lesson #5</p>
+              {upcomingLesson ? (
+                <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex gap-4 items-center">
+                      <Avatar name={upcomingLesson.mentorName} photo={mentor.photo} size="md" className="rounded-xl shadow-md" />
+                      <div>
+                        <h3 className="font-serif text-lg text-zinc-900">{upcomingLesson.mentorName}</h3>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{upcomingLesson.instrument} • Lesson #{studentLogs.length + 1}</p>
+                      </div>
+                    </div>
+                    <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                      <Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away
                     </div>
                   </div>
-                  <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    <Clock size={10} /> 2 Days Away
+
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Date & Time</p>
+                      <p className="text-xs font-bold text-zinc-900">{new Date(upcomingLesson.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} • {upcomingLesson.time}</p>
+                    </div>
+                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Location</p>
+                      <p className="text-xs font-bold text-zinc-900 truncate">{upcomingLesson.location || 'Bangsar Studio'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowRescheduleModal(true)}
+                      className="flex-1 py-4 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full shadow-lg shadow-black/10 transition-transform active:scale-95"
+                    >
+                      Reschedule
+                    </button>
+                    <button className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95">
+                      Cancel
+                    </button>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Date & Time</p>
-                    <p className="text-xs font-bold text-zinc-900">15 Mar • 14:00</p>
+              ) : (
+                <div className="bg-white border border-zinc-100 border-dashed rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-300">
+                    <Calendar size={24} />
                   </div>
-                  <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Location</p>
-                    <p className="text-xs font-bold text-zinc-900 truncate">Bangsar Studio</p>
+                  <div>
+                    <p className="text-sm font-bold text-zinc-900">No upcoming sessions</p>
+                    <p className="text-[10px] text-zinc-400 mt-1">Ready to continue your journey?</p>
                   </div>
-                </div>
-
-                <div className="flex gap-3">
                   <button 
-                    onClick={() => setShowRescheduleModal(true)}
-                    className="flex-1 py-4 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full shadow-lg shadow-black/10 transition-transform active:scale-95"
+                    onClick={() => switchStudentTab('home')}
+                    className="px-6 py-3 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full"
                   >
-                    Reschedule
-                  </button>
-                  <button className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95">
-                    Cancel
+                    Book a Session
                   </button>
                 </div>
-              </div>
+              )}
             </section>
 
             {/* Past Lessons Log */}
@@ -3746,7 +3731,15 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                {pastLessons.map((lesson) => {
+                {pastLessons.length === 0 ? (
+                  <div className="bg-white border border-zinc-100 rounded-[2rem] p-8 text-center shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center mx-auto mb-3">
+                      <Music2 size={20} className="text-zinc-300" />
+                    </div>
+                    <p className="text-sm font-bold text-zinc-400 mb-1">No lessons logged yet</p>
+                    <p className="text-xs text-zinc-300">Your lesson history will appear here after your first session.</p>
+                  </div>
+                ) : pastLessons.map((lesson) => {
                   const isExpanded = expandedLesson === lesson.id || (lesson.isLatest && expandedLesson === null);
                   return (
                     <div key={lesson.id} className={`bg-white border border-zinc-100 rounded-[2rem] transition-all overflow-hidden ${isExpanded ? 'shadow-lg' : 'shadow-sm'}`}>
@@ -4122,7 +4115,7 @@ export default function App() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="relative">
-                      <img src={details.photo} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+                      <img src={details.photo || null} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -4669,7 +4662,7 @@ export default function App() {
               className="absolute inset-0"
             >
               <img 
-                src={splashCards[splashIndex].image} 
+                src={splashCards[splashIndex].image || null} 
                 className="w-full h-full object-cover opacity-60" 
                 referrerPolicy="no-referrer"
               />
@@ -5274,13 +5267,14 @@ export default function App() {
                 ) : (
                   lessons.filter(l => l.status === 'pending').map(request => {
                     const student = realStudents.find(s => s.id === request.studentId) || MOCK_STUDENTS.find(s => s.id === request.studentId);
+                    const resolvedStudentName = student?.name || (request.studentName && request.studentName !== 'Student' ? request.studentName : null) || `Student (${request.studentId?.slice(0,6) || '?'})`;
                     return (
                       <div key={request.id} className={`border p-4 rounded-2xl transition-all hover:shadow-lg ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/[0.07]' : 'bg-white border-zinc-200 hover:border-zinc-300 shadow-sm'}`}>
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex gap-3 items-center">
                             {/* Student Photo */}
                             <Avatar 
-                              name={request.studentName} 
+                              name={resolvedStudentName} 
                               photo={student?.photo} 
                               size="md" 
                               className={`border ${isDark ? 'border-white/10' : 'border-zinc-200'}`} 
@@ -5288,7 +5282,7 @@ export default function App() {
                             
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>{request.studentName}</h3>
+                                <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>{resolvedStudentName}</h3>
                                 <Badge variant={request.type === 'Trial' ? 'gold' : request.type === 'Monthly' ? 'harbour' : 'outline'}>
                                   {request.type}
                                 </Badge>
@@ -5405,20 +5399,24 @@ export default function App() {
                     .filter(l => l.status === 'confirmed' && new Date(l.date) >= new Date(new Date().setHours(0,0,0,0)))
                     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                     .slice(0, 3)
-                    .map(lesson => (
-                      <div key={lesson.id} className={`p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10 text-white/60' : 'bg-zinc-100 text-zinc-500'}`}>
-                            <Calendar size={14} />
+                    .map(lesson => {
+                      const student = realStudents.find(s => s.id === lesson.studentId) || MOCK_STUDENTS.find(s => s.id === lesson.studentId);
+                      const resolvedStudentName = student?.name || (lesson.studentName && lesson.studentName !== 'Student' ? lesson.studentName : null) || `Student (${lesson.studentId?.slice(0,6) || '?'})`;
+                      return (
+                        <div key={lesson.id} className={`p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10 text-white/60' : 'bg-zinc-100 text-zinc-500'}`}>
+                              <Calendar size={14} />
+                            </div>
+                            <div>
+                              <p className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{resolvedStudentName}</p>
+                              <p className={`text-[8px] ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>{new Date(lesson.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {lesson.time}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{lesson.studentName}</p>
-                            <p className={`text-[8px] ${isDark ? 'text-white/40' : 'text-zinc-500'}`}>{new Date(lesson.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {lesson.time}</p>
-                          </div>
+                          <ChevronRight size={12} className={isDark ? "text-white/20" : "text-zinc-300"} />
                         </div>
-                        <ChevronRight size={12} className={isDark ? "text-white/20" : "text-zinc-300"} />
-                      </div>
-                    ))}
+                      );
+                    })}
                   {lessons.filter(l => l.status === 'confirmed').length === 0 && (
                     <div className={`p-4 rounded-xl border border-dashed text-center ${isDark ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
                       <p className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? 'text-white/30' : 'text-zinc-400'}`}>No confirmed lessons</p>
@@ -5445,6 +5443,7 @@ export default function App() {
                 ) : (
                   lessons.filter(l => l.status === 'confirmed').map(lesson => {
                     const student = realStudents.find(s => s.id === lesson.studentId) || MOCK_STUDENTS.find(s => s.id === lesson.studentId);
+                    const resolvedStudentName = student?.name || (lesson.studentName && lesson.studentName !== 'Student' ? lesson.studentName : null) || `Student (${lesson.studentId?.slice(0,6) || '?'})`;
                     return (
                       <div key={lesson.id} className={`border p-4 rounded-2xl relative group transition-transform ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'}`}>
                         <div className="flex justify-between items-start mb-4">
@@ -5452,7 +5451,7 @@ export default function App() {
                             {/* Student Photo */}
                             <div className="relative">
                               <Avatar 
-                                name={lesson.studentName} 
+                                name={resolvedStudentName} 
                                 photo={student?.photo} 
                                 size="md" 
                                 className={`border-2 ${isDark ? 'border-white/10' : 'border-zinc-100'} shadow-lg`} 
@@ -5462,7 +5461,7 @@ export default function App() {
                             
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>{lesson.studentName}</h3>
+                                <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>{resolvedStudentName}</h3>
                                 <Badge variant={lesson.type === 'Trial' ? 'gold' : lesson.type === 'Monthly' ? 'harbour' : 'outline'}>
                                   {lesson.type}
                                 </Badge>
@@ -5602,18 +5601,19 @@ export default function App() {
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .map(lesson => {
             const student = realStudents.find(s => s.id === lesson.studentId) || MOCK_STUDENTS.find(s => s.id === lesson.studentId);
+            const resolvedStudentName = student?.name || (lesson.studentName && lesson.studentName !== 'Student' ? lesson.studentName : null) || `Student (${lesson.studentId?.slice(0,6) || '?'})`;
             return (
               <div key={lesson.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl relative group">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-3 items-center">
-                    <img 
-                      src={student?.photo || `https://picsum.photos/seed/${lesson.studentId}/100`} 
-                      className="w-10 h-10 rounded-full object-cover border border-white/10" 
-                      referrerPolicy="no-referrer"
-                      alt={lesson.studentName}
+                    <Avatar 
+                      name={resolvedStudentName} 
+                      photo={student?.photo} 
+                      size="md" 
+                      className="rounded-full border border-white/10" 
                     />
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold truncate">{lesson.studentName}</h3>
+                      <h3 className="text-sm font-bold truncate">{resolvedStudentName}</h3>
                       <p className="text-white/40 text-[9px] truncate">{lesson.instrument}</p>
                     </div>
                   </div>
@@ -5663,72 +5663,107 @@ export default function App() {
   const StudentsView = () => {
     const [rosterFilter, setRosterFilter] = useState('All');
     const [rosterSearch, setRosterSearch] = useState('');
+    
+    const filteredStudents = (realStudents.length > 0 ? realStudents : MOCK_STUDENTS)
+      .filter(s => rosterFilter === 'All' || s.package === rosterFilter || 
+        (rosterFilter === 'Package' && (s.package === 'Package 8' || s.package === 'Package 12')))
+      .filter(s => s.name.toLowerCase().includes(rosterSearch.toLowerCase()));
+
     return (
-      <div className="px-5 pt-12 pb-32">
-      <header className="mb-4">
-        <span className="text-[8px] uppercase tracking-[0.3em] font-mono font-semibold text-zinc-400 mb-1 block">Roster</span>
-        <h1 className="text-2xl font-serif-sturdy">Active Students</h1>
-      </header>
+      <div className="px-5 pt-12 pb-32 bg-zinc-50 min-h-full">
+        <header className="mb-6">
+          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-harbour-600 mb-1 block">Roster</span>
+          <h1 className="text-3xl font-serif-sturdy text-zinc-900">Active Students</h1>
+          <p className="text-xs text-zinc-400 mt-1">{filteredStudents.length} students currently enrolled</p>
+        </header>
 
-      {/* Filters - Horizontal Scroll */}
-      <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-hide -mx-5 px-5">
-        {['All', 'Trial', 'Single', 'Package'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setRosterFilter(tab)}
-            className={`px-3 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-all ${
-              rosterFilter === tab ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-400'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+        {/* Filters */}
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-5 px-5">
+          {['All', 'Trial', 'Single', 'Package'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setRosterFilter(tab)}
+              className={`px-5 py-2 rounded-full text-[10px] font-bold whitespace-nowrap transition-all border ${
+                rosterFilter === tab ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-black/10' : 'bg-white border-zinc-200 text-zinc-400'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={14} />
-        <input
-          value={rosterSearch}
-          onChange={(e) => setRosterSearch(e.target.value)}
-          className="w-full bg-zinc-100 border border-zinc-200 rounded-full pl-10 pr-4 py-2.5 text-xs focus:outline-none"
-          placeholder="Search students..."
-        />
-      </div>
+        {/* Search Bar */}
+        <div className="relative mb-6">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
+            <Search size={16} />
+          </div>
+          <input
+            value={rosterSearch}
+            onChange={(e) => setRosterSearch(e.target.value)}
+            className="w-full bg-white border border-zinc-200 rounded-2xl pl-12 pr-4 py-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-harbour-500/20 transition-all"
+            placeholder="Search by name or instrument..."
+          />
+        </div>
 
-      {/* List - Compact Cards */}
-      <div className="space-y-2 pb-32">
-        {(realStudents.length > 0 ? realStudents : MOCK_STUDENTS)
-          .filter(s => rosterFilter === 'All' || s.package === rosterFilter || 
-            (rosterFilter === 'Package' && (s.package === 'Package 8' || s.package === 'Package 12')))
-          .filter(s => s.name.toLowerCase().includes(rosterSearch.toLowerCase()))
-          .map(student => (
-          <motion.div 
-            key={student.id}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => { setSelectedStudent(student); setView('student-detail'); }}
-            className="bg-white border border-zinc-200 p-4 rounded-2xl flex items-center gap-4 shadow-sm hover:border-zinc-300 transition-all"
-          >
-            <Avatar name={student.name} photo={student.photo} size="md" className="rounded-xl border border-zinc-100" />
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="text-sm font-bold truncate text-zinc-900">{student.name}</h3>
-                <Badge variant="harbour" className="text-[8px] px-1.5 py-0">{student.lessonsRemaining} Left</Badge>
-              </div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <p className="text-zinc-500 text-[9px] font-medium truncate">{student.instrument}</p>
-                <span className="w-0.5 h-0.5 bg-zinc-300 rounded-full" />
-                <span className="text-[9px] font-bold text-harbour-600 uppercase tracking-tighter">Stage {Math.floor(student.progress / 20) + 1}</span>
-              </div>
-              <div className="mt-1">
-                <ProgressBar progress={student.progress} className="h-1 bg-zinc-100" />
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-300" />
-          </motion.div>
-        ))}
+        {/* List */}
+        <div className="space-y-4">
+          {filteredStudents.map(student => {
+            const stage = Math.min(Math.floor((student.progress || 0) / 25) + 1, 4);
+            const stageColors = {
+              1: 'bg-amber-50 text-amber-600 border-amber-100',
+              2: 'bg-harbour-50 text-harbour-600 border-harbour-100',
+              3: 'bg-blue-50 text-blue-600 border-blue-100',
+              4: 'bg-purple-50 text-purple-600 border-purple-100'
+            };
+
+            return (
+              <motion.div 
+                key={student.id}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => { setSelectedStudent(student); setView('student-detail'); }}
+                className="bg-white border border-zinc-100 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative">
+                    <Avatar name={student.name} photo={student.photo} size="lg" className="rounded-2xl border-2 border-white shadow-sm" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-base font-bold text-zinc-900 group-hover:text-harbour-600 transition-colors">{student.name}</h3>
+                        <p className="text-[11px] text-zinc-500 font-medium">{student.instrument}</p>
+                      </div>
+                      <Badge className={`border ${stageColors[stage as keyof typeof stageColors]}`}>
+                        Stage {stage}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end mb-1">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Progress</span>
+                    <span className="text-[10px] font-bold text-zinc-900">{student.progress}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${student.progress}%` }}
+                      className="h-full bg-gradient-to-r from-harbour-400 to-harbour-500 rounded-full"
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-50">
+                    <span className="text-[10px] font-bold text-zinc-400">{student.package}</span>
+                    <span className="text-[10px] font-bold text-harbour-600">{student.lessonsRemaining} lessons left</span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
-    </div>
     );
   };
 
@@ -7279,7 +7314,7 @@ export default function App() {
           <div className="flex flex-col items-center text-center mb-8 relative z-10">
             <div className="relative mb-4">
               <img 
-                src={selectedStudent.photo} 
+                src={selectedStudent.photo || null} 
                 className="w-[58px] h-[58px] rounded-xl object-cover shadow-2xl border border-white/10" 
                 referrerPolicy="no-referrer" 
               />
@@ -8260,7 +8295,7 @@ export default function App() {
             <div className="space-y-6">
               {/* Header */}
               <div className="flex items-center gap-4 mb-4">
-                <img src={selectedMentor.photo} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                <img src={selectedMentor.photo || null} className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
                 <div>
                   <h3 className="text-sm font-serif-sturdy">{selectedMentor.name}</h3>
                   <p className="text-[9px] text-white/40 uppercase tracking-widest">
