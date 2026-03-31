@@ -2367,7 +2367,7 @@ export default function App() {
     }
   };
 
-  const handleSaveSession = async () => {
+  const handleSaveSession = async (coveredOverride?: string, focusOverride?: string) => {
     if (!selectedStudent || !selectedLesson || !currentUser) return;
 
     try {
@@ -2376,8 +2376,8 @@ export default function App() {
         mentorId: currentUser.uid,
         lessonNumber: selectedLesson.lessonNumber,
         date: new Date().toISOString().split('T')[0],
-        covered: sessionCovered,
-        focus: sessionFocus,
+        covered: coveredOverride ?? sessionCovered,
+        focus: focusOverride ?? sessionFocus,
         milestones: selectedMilestones,
         materials: [], // TODO: handle materials
         rating: sessionRating,
@@ -3560,7 +3560,11 @@ export default function App() {
     const currentStudent = userProfile || MOCK_STUDENTS[0];
     const mentor = realMentors.find(m => m.id === studentLessons[0]?.mentorId) || MOCK_MENTORS[0];
 
-    const upcomingLesson = studentLessons.find(l => l.status === 'confirmed' && new Date(l.date) >= new Date());
+    const upcomingLesson = studentLessons.find(l => 
+      l.status === 'confirmed' && 
+      new Date(l.date) >= new Date() &&
+      (l.instrument === selectedInstrumentJourney || !l.instrument)
+    );
     
     // Dynamic instruments based on student's active lessons
     const activeInstruments = Array.from(new Set(studentLessons.map(l => l.instrument).filter(Boolean)));
@@ -4032,7 +4036,7 @@ export default function App() {
           ))}
         </div>
 
-        <div className={`p-5 pb-10 border-t ${dark ? 'border-white/10' : 'border-zinc-100'}`}>
+        <div className={`p-4 border-t flex-shrink-0 ${dark ? 'border-white/10 bg-zinc-900' : 'border-zinc-100 bg-white'}`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <div className="relative">
             <input 
               ref={inputRef}
@@ -5667,7 +5671,10 @@ export default function App() {
     const [rosterFilter, setRosterFilter] = useState('All');
     const [rosterSearch, setRosterSearch] = useState('');
     
+    // Only show students who have actually booked a session with this mentor
+    const bookedStudentIds = new Set(lessons.map(l => l.studentId));
     const filteredStudents = (realStudents.length > 0 ? realStudents : MOCK_STUDENTS)
+      .filter(s => bookedStudentIds.has(s.id))
       .filter(s => rosterFilter === 'All' || s.package === rosterFilter || 
         (rosterFilter === 'Package' && (s.package === 'Package 8' || s.package === 'Package 12')))
       .filter(s => s.name.toLowerCase().includes(rosterSearch.toLowerCase()));
@@ -7056,8 +7063,18 @@ export default function App() {
   const LogSessionView = () => {
     if (!selectedStudent || !selectedLesson) return null;
 
+    // Local state for inputs to prevent typing lag from outer state re-renders
+    const [localCovered, setLocalCovered] = React.useState(sessionCovered);
+    const [localFocus, setLocalFocus] = React.useState(sessionFocus);
+    const [localBrainDump, setLocalBrainDump] = React.useState('');
+
+    // Sync local state when outer state changes (e.g. after AI generate)
+    React.useEffect(() => { setLocalCovered(sessionCovered); }, [sessionCovered]);
+    React.useEffect(() => { setLocalFocus(sessionFocus); }, [sessionFocus]);
+
     const handleAIGenerate = async () => {
-      if (!aiBrainDump) return;
+      if (!localBrainDump) return;
+      setAiBrainDump(localBrainDump);
       setIsGenerating(true);
 
       const studentName = selectedStudent.name;
@@ -7085,7 +7102,7 @@ Respond ONLY with a JSON object like this, no other text:
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             system: systemPrompt,
-            messages: [{ role: 'user', content: aiBrainDump }],
+            messages: [{ role: 'user', content: localBrainDump }],
           }),
         });
 
@@ -7106,18 +7123,22 @@ Respond ONLY with a JSON object like this, no other text:
       } catch (err) {
         console.error('AI Generate error:', err);
         // Graceful fallback: split brain dump roughly
-        const sentences = aiBrainDump.split('.').filter(s => s.trim().length > 0);
+        const sentences = localBrainDump.split('.').filter(s => s.trim().length > 0);
         setSessionCovered(sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.');
         setSessionFocus(sentences.slice(Math.ceil(sentences.length / 2)).join('. ') + '.');
       } finally {
         setIsGenerating(false);
         setShowAIGenerateSheet(false);
+        setLocalBrainDump('');
         setAiBrainDump('');
       }
     };
 
     const handleSave = () => {
-      handleSaveSession();
+      // Pass local textarea values directly to avoid async setState timing issues
+      setSessionCovered(localCovered);
+      setSessionFocus(localFocus);
+      handleSaveSession(localCovered, localFocus);
       setSessionSaveSuccess(true);
       setTimeout(() => {
         setSessionSaveSuccess(false);
@@ -7223,8 +7244,9 @@ Respond ONLY with a JSON object like this, no other text:
             <div className="space-y-2">
               <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">What did you cover?</label>
               <textarea 
-                value={sessionCovered}
-                onChange={(e) => setSessionCovered(e.target.value)}
+                value={localCovered}
+                onChange={(e) => setLocalCovered(e.target.value)}
+                onBlur={() => setSessionCovered(localCovered)}
                 className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900 leading-relaxed"
                 placeholder="Topics taught, techniques explored..."
               />
@@ -7234,8 +7256,9 @@ Respond ONLY with a JSON object like this, no other text:
             <div className="space-y-2">
               <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Practice focus for next session</label>
               <textarea 
-                value={sessionFocus}
-                onChange={(e) => setSessionFocus(e.target.value)}
+                value={localFocus}
+                onChange={(e) => setLocalFocus(e.target.value)}
+                onBlur={() => setSessionFocus(localFocus)}
                 className="w-full bg-amber-50/30 border border-amber-100/50 rounded-2xl p-4 text-xs min-h-[80px] focus:outline-none text-zinc-900 italic"
                 placeholder="What should the student work on?"
               />
@@ -7306,16 +7329,16 @@ Respond ONLY with a JSON object like this, no other text:
               Type a quick brain dump of what happened in the lesson. AI will structure it into a beautiful log for your student.
             </p>
             <textarea 
-              value={aiBrainDump}
-              onChange={(e) => setAiBrainDump(e.target.value)}
+              value={localBrainDump}
+              onChange={(e) => setLocalBrainDump(e.target.value)}
               className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900"
               placeholder="e.g. Sarah did great today. We finished the D major scale and started the first page of Zapin Melayu. She needs to work on her thumb position."
             />
             <button 
               onClick={handleAIGenerate}
-              disabled={isGenerating || !aiBrainDump}
+              disabled={isGenerating || !localBrainDump}
               className={`w-full py-4 rounded-2xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
-                isGenerating || !aiBrainDump ? 'bg-zinc-100 text-zinc-400' : 'bg-harbour-600 text-white shadow-lg'
+                isGenerating || !localBrainDump ? 'bg-zinc-100 text-zinc-400' : 'bg-harbour-600 text-white shadow-lg'
               }`}
             >
               {isGenerating ? (
@@ -7360,6 +7383,10 @@ Respond ONLY with a JSON object like this, no other text:
       });
       setSelectedStudent({ ...selectedStudent, learningPath: newPath });
     };
+
+    // Local state for private notes editing — prevents lag
+    const [isEditingNotes, setIsEditingNotes] = React.useState(false);
+    const [localNotes, setLocalNotes] = React.useState(selectedStudent.privateNotes || '');
 
     const VisibilityBadge = ({ type }: { type: 'student' | 'mentor' }) => (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wider ${
@@ -7443,13 +7470,52 @@ Respond ONLY with a JSON object like this, no other text:
               <div className="absolute top-0 right-0 p-3 opacity-10">
                 <Lock size={40} className="text-amber-900" />
               </div>
-              <p className="text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-4">
-                "Sarah responds really well to visual metaphors. She's struggling with the bridge section of 'Zapin Melayu' but her finger strength has improved significantly. Remind her to keep her thumb relaxed during the faster passages."
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
-                <button className="text-[9px] font-bold text-amber-700 underline underline-offset-2">Edit Notes</button>
-              </div>
+              {isEditingNotes ? (
+                <>
+                  <textarea
+                    value={localNotes}
+                    onChange={(e) => setLocalNotes(e.target.value)}
+                    autoFocus
+                    className="w-full bg-white/60 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-3 focus:outline-none focus:border-amber-400 min-h-[100px] resize-none"
+                    placeholder="Add private notes about this student..."
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => { setIsEditingNotes(false); setLocalNotes(selectedStudent.privateNotes || ''); }}
+                        className="text-[9px] font-bold text-amber-600/60 px-3 py-1 rounded-full border border-amber-200"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedStudent({ ...selectedStudent, privateNotes: localNotes });
+                          setIsEditingNotes(false);
+                        }}
+                        className="text-[9px] font-bold text-white bg-amber-600 px-3 py-1 rounded-full"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-4">
+                    {localNotes || selectedStudent.privateNotes || 'No private notes yet. Tap Edit to add your observations.'}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
+                    <button 
+                      onClick={() => setIsEditingNotes(true)}
+                      className="text-[9px] font-bold text-amber-700 underline underline-offset-2"
+                    >
+                      Edit Notes
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -7647,37 +7713,45 @@ Respond ONLY with a JSON object like this, no other text:
           title="Add New Stage"
           dark={false}
         >
-          <div className="px-6 pb-10 space-y-6">
-            <div className="space-y-3">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Stage Title</label>
-              <input 
-                type="text" 
-                value={newMilestoneTitle}
-                onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                placeholder="e.g. Advanced Finger Picking"
-                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
-              />
-            </div>
-            <button 
-              onClick={() => {
-                if (!newMilestoneTitle) return;
-                const newMilestone: Milestone = {
-                  id: 'm' + Date.now(),
-                  title: newMilestoneTitle,
-                  status: 'upcoming'
-                };
-                setSelectedStudent({
-                  ...selectedStudent,
-                  learningPath: [...(selectedStudent.learningPath || []), newMilestone]
-                });
-                setNewMilestoneTitle('');
-                setShowAddMilestoneSheet(false);
-              }}
-              className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
-            >
-              Add Stage
-            </button>
-          </div>
+          {(() => {
+            const MilestoneForm = () => {
+              const [localTitle, setLocalTitle] = React.useState('');
+              return (
+                <div className="px-6 pb-10 space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Stage Title</label>
+                    <input 
+                      type="text" 
+                      autoFocus
+                      value={localTitle}
+                      onChange={(e) => setLocalTitle(e.target.value)}
+                      placeholder="e.g. Advanced Finger Picking"
+                      className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (!localTitle) return;
+                      const newMilestone: Milestone = {
+                        id: 'm' + Date.now(),
+                        title: localTitle,
+                        status: 'upcoming'
+                      };
+                      setSelectedStudent({
+                        ...selectedStudent,
+                        learningPath: [...(selectedStudent.learningPath || []), newMilestone]
+                      });
+                      setShowAddMilestoneSheet(false);
+                    }}
+                    className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+                  >
+                    Add Stage
+                  </button>
+                </div>
+              );
+            };
+            return <MilestoneForm />;
+          })()}
         </BottomSheet>
 
         {/* Add Material Bottom Sheet */}
@@ -7687,48 +7761,55 @@ Respond ONLY with a JSON object like this, no other text:
           title="Upload Material"
           dark={false}
         >
-          <div className="px-6 pb-10 space-y-6">
-            <div className="space-y-3">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Material Title</label>
-              <input 
-                type="text" 
-                value={newMaterialTitle}
-                onChange={(e) => setNewMaterialTitle(e.target.value)}
-                placeholder="e.g. Scale Exercises PDF"
-                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
-              />
-            </div>
-            <div className="space-y-3">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Type</label>
-              <div className="flex gap-2">
-                {(['PDF', 'Guide', 'Notes'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setNewMaterialType(type)}
-                    className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${
-                      (newMaterialType as string) === (type as string)
-                        ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' 
-                        : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
-                    }`}
+          {(() => {
+            const MaterialForm = () => {
+              const [localTitle, setLocalTitle] = React.useState('');
+              const [localType, setLocalType] = React.useState<'PDF' | 'Guide' | 'Notes'>('PDF');
+              return (
+                <div className="px-6 pb-10 space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Material Title</label>
+                    <input 
+                      type="text" 
+                      autoFocus
+                      value={localTitle}
+                      onChange={(e) => setLocalTitle(e.target.value)}
+                      placeholder="e.g. Scale Exercises PDF"
+                      className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Type</label>
+                    <div className="flex gap-2">
+                      {(['PDF', 'Guide', 'Notes'] as const).map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setLocalType(type)}
+                          className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${
+                            localType === type
+                              ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' 
+                              : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (!localTitle) return;
+                      setShowAddMaterialSheet(false);
+                    }}
+                    className="w-full py-5 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
                   >
-                    {type}
+                    Upload Material
                   </button>
-                ))}
-              </div>
-            </div>
-            <button 
-              onClick={() => {
-                if (!newMaterialTitle) return;
-                // In a real app we'd update MOCK_MATERIALS or a stateful equivalent
-                // For now we'll just close the sheet
-                setNewMaterialTitle('');
-                setShowAddMaterialSheet(false);
-              }}
-              className="w-full py-5 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
-            >
-              Upload Material
-            </button>
-          </div>
+                </div>
+              );
+            };
+            return <MaterialForm />;
+          })()}
         </BottomSheet>
 
         {/* Sticky Bottom Bar */}
@@ -8186,7 +8267,8 @@ Respond ONLY with a JSON object like this, no other text:
             </motion.main>
           </AnimatePresence>
 
-          {/* Mobile Nav */}
+          {/* Mobile Nav - hidden on detail/session pages */}
+          {view !== 'student-detail' && view !== 'log-session' && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
@@ -8220,6 +8302,7 @@ Respond ONLY with a JSON object like this, no other text:
               ))}
             </div>
           </div>
+          )}
         </>
       )}
 
