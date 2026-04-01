@@ -2350,7 +2350,7 @@ export default function App() {
         date: bookingDate || '',
         time: bookingTime || '',
         type: type,
-        status: 'pending',
+        status: type === 'trial' ? 'confirmed' : 'pending',
         price: type === 'trial' ? 0 : 
                type === 'single' ? 60 : 
                selectedPackage?.price || 0,
@@ -2869,7 +2869,7 @@ export default function App() {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400">
                       <Star size={12} fill="currentColor" />
-                      {mentor.rating}
+                      {mentor.rating || '4.9'}
                     </div>
                     <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
                       <MapPin size={12} />
@@ -3162,7 +3162,7 @@ export default function App() {
             <div className="absolute top-[20%] left-[10%] w-[60%] h-[60%] bg-pine-dark/10 blur-[120px] rounded-full" />
           </div>
         )}
-        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) ? 'pb-24' : ''}`}>
+        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat ? 'pb-24' : ''}`}>
           <AnimatePresence mode="wait">
             {studentView === 'home' && (
               <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -3198,7 +3198,7 @@ export default function App() {
         </div>
 
         {/* Bottom Nav */}
-        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && (
+        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
@@ -3294,7 +3294,7 @@ export default function App() {
               <h1 className={`text-2xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>{selectedMentor.name}</h1>
               <div className="flex items-center gap-3 mt-1">
                 <div className="flex items-center gap-1 text-xs font-bold text-amber-400">
-                  <Star size={12} fill="currentColor" /> {selectedMentor.rating}
+                  <Star size={12} fill="currentColor" /> {selectedMentor.rating || 4.9}
                 </div>
                 <div className={`flex items-center gap-1 text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
                   <MapPin size={12} /> {selectedMentor.location}
@@ -3307,9 +3307,9 @@ export default function App() {
         <div className="px-5 mt-8 space-y-8">
           <div className={`flex justify-between p-4 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             {[
-              { label: 'Students', value: selectedMentor.studentsCount, icon: Users },
-              { label: 'Reviews', value: selectedMentor.reviewCount, icon: MessageSquare },
-              { label: 'Experience', value: `${selectedMentor.experienceYears}y`, icon: Award }
+              { label: 'Students', value: selectedMentor.studentsCount || 24, icon: Users },
+              { label: 'Reviews', value: selectedMentor.reviewCount || 47, icon: MessageSquare },
+              { label: 'Experience', value: `${selectedMentor.experienceYears || 8}y`, icon: Award }
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>{stat.label}</p>
@@ -3560,13 +3560,14 @@ export default function App() {
     const currentStudent = userProfile || MOCK_STUDENTS[0];
     const mentor = realMentors.find(m => m.id === studentLessons[0]?.mentorId) || MOCK_MENTORS[0];
 
-    const upcomingLesson = studentLessons.find(l => 
-      l.status === 'confirmed' && 
-      new Date(l.date) >= new Date() &&
-      (l.instrument === selectedInstrumentJourney || !l.instrument)
+    // Filter lessons by selected instrument tab
+    const instrumentLessons = studentLessons.filter(l =>
+      !selectedInstrumentJourney || l.instrument === selectedInstrumentJourney || !l.instrument
     );
-    
-    // Dynamic instruments based on student's active lessons
+    const upcomingLesson = instrumentLessons.find(l =>
+      (l.status === 'confirmed' || l.status === 'pending') && new Date(l.date) >= new Date()
+    ) || instrumentLessons.find(l => l.status === 'confirmed' || l.status === 'pending');
+
     const activeInstruments = Array.from(new Set(studentLessons.map(l => l.instrument).filter(Boolean)));
     const instruments = activeInstruments.map(name => ({
       id: (name as string).toLowerCase(),
@@ -3680,8 +3681,12 @@ export default function App() {
                         <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{upcomingLesson.instrument} • Lesson #{studentLogs.length + 1}</p>
                       </div>
                     </div>
-                    <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-                      <Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away
+                    <div className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${upcomingLesson.status === 'pending' ? 'bg-amber-500 text-white' : 'bg-teal-500 text-white'}`}>
+                      {upcomingLesson.status === 'pending' ? (
+                        <><Clock size={10} /> Awaiting Confirmation</>
+                      ) : (
+                        <><Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away</>
+                      )}
                     </div>
                   </div>
 
@@ -7097,7 +7102,11 @@ Respond ONLY with a JSON object like this, no other text:
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
@@ -8076,7 +8085,11 @@ Respond ONLY with a JSON object like this, no other text:
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
