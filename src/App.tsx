@@ -1668,7 +1668,7 @@ export default function App() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentActiveLesson, setStudentActiveLesson] = useState<any>(null);
   const [studentLessons, setStudentLessons] = useState<any[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(true);
+  const [lessonsLoading, setLessonsLoading] = useState(false);
   const [studentLogs, setStudentLogs] = useState<any[]>([]);
   const [studentTransactions, setStudentTransactions] = useState<any[]>([]);
   const [studentProfile, setStudentProfile] = useState<any>({
@@ -1878,6 +1878,7 @@ export default function App() {
   // Student Journey Data Listener
   useEffect(() => {
     if (!currentUser || !isStudent || !userProfile) return;
+    setLessonsLoading(true);
     
     const lessonsQuery = query(
       collection(db, 'lessons'),
@@ -3183,7 +3184,7 @@ export default function App() {
               </motion.div>
             )}
             {studentView === 'journey' && (
-              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-full">
                 <StudentJourneyView forcedDark={false} />
               </motion.div>
             )}
@@ -3538,14 +3539,14 @@ export default function App() {
     const dark = false;
     
     if (lessonsLoading) return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 pt-32 bg-[#F9F9F9]">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 pt-32 bg-[#F9F9F9]">
         <div className="w-10 h-10 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
         <p className="text-xs text-zinc-400 font-medium">Loading your journey...</p>
       </div>
     );
 
     if (studentLessons.length === 0) return (
-      <div className={`flex flex-col items-center justify-center h-full gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
+      <div className={`flex flex-col items-center justify-center min-h-screen gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
           <Music2 size={32} className={dark ? 'text-white/20' : 'text-zinc-300'} />
         </div>
@@ -3636,7 +3637,7 @@ export default function App() {
     });
     
     return (
-      <div className="min-h-full px-5 pt-8 bg-[#F9F9F9] text-zinc-900 pb-32">
+      <div className="min-h-screen px-5 pt-8 bg-[#F9F9F9] text-zinc-900 pb-32">
         {/* Header Area */}
         <div className="flex justify-between items-end mb-4">
           <div>
