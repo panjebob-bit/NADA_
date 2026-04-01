@@ -2567,6 +2567,10 @@ export default function App() {
   const [showAIBuddySheet, setShowAIBuddySheet] = useState(false);
   const [aiBuddyMessages, setAiBuddyMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const [isAiBuddyTyping, setIsAiBuddyTyping] = useState(false);
+  const [anthropicApiKey, setAnthropicApiKey] = useState<string>(() => {
+    try { return localStorage.getItem('nada_anthropic_key') || ''; } catch { return ''; }
+  });
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [bookingDate, setBookingDate] = useState<string | null>(null);
   const [bookingTime, setBookingTime] = useState<string | null>(null);
   const [bookingNote, setBookingNote] = useState('');
@@ -7106,6 +7110,7 @@ Respond ONLY with a JSON object like this, no other text:
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true',
+            'x-api-key': anthropicApiKey,
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
@@ -7909,6 +7914,15 @@ Respond ONLY with a JSON object like this, no other text:
 
     const prompts = isStudent ? studentPrompts : mentorPrompts;
 
+    const [localKeyInput, setLocalKeyInput] = useState(anthropicApiKey);
+
+    const saveKey = (key: string) => {
+      const trimmed = key.trim();
+      setAnthropicApiKey(trimmed);
+      try { localStorage.setItem('nada_anthropic_key', trimmed); } catch {}
+      setShowApiKeyInput(false);
+    };
+
     return (
       <BottomSheet 
         isOpen={showAIBuddySheet} 
@@ -7927,7 +7941,48 @@ Respond ONLY with a JSON object like this, no other text:
                 </h3>
               </div>
             </div>
+            <button
+              onClick={() => { setLocalKeyInput(anthropicApiKey); setShowApiKeyInput(v => !v); }}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${anthropicApiKey ? 'bg-harbour-500/20 text-harbour-400' : 'bg-red-500/20 text-red-400 animate-pulse'}`}
+              title="Set API Key"
+            >
+              <Settings size={16} />
+            </button>
           </div>
+
+          {/* API Key input banner */}
+          {(!anthropicApiKey || showApiKeyInput) && (
+            <div className="px-4 py-3 bg-zinc-800 border-b border-white/10 space-y-2">
+              {!anthropicApiKey && !showApiKeyInput && (
+                <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">⚠ No API key set — AI will not work</p>
+              )}
+              {showApiKeyInput && (
+                <>
+                  <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Enter your Anthropic API Key</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={localKeyInput}
+                      onChange={e => setLocalKeyInput(e.target.value)}
+                      placeholder="sk-ant-..."
+                      className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-harbour-500"
+                    />
+                    <button
+                      onClick={() => saveKey(localKeyInput)}
+                      className="px-4 py-2 bg-harbour-500 text-white text-xs font-bold rounded-xl"
+                    >Save</button>
+                  </div>
+                  <p className="text-[9px] text-white/30">Your key is stored only in this browser. Get one at console.anthropic.com</p>
+                </>
+              )}
+              {!anthropicApiKey && !showApiKeyInput && (
+                <button
+                  onClick={() => setShowApiKeyInput(true)}
+                  className="text-[10px] text-harbour-400 font-bold underline"
+                >Set API Key →</button>
+              )}
+            </div>
+          )}
 
           {/* Chat Area - Clean & Professional */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
@@ -8040,6 +8095,14 @@ Respond ONLY with a JSON object like this, no other text:
 
           {/* Input Area */}
           <div className="p-5 bg-white border-t border-zinc-100">
+            {!anthropicApiKey ? (
+              <button
+                onClick={() => setShowApiKeyInput(true)}
+                className="w-full py-4 bg-zinc-900 text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2"
+              >
+                <Settings size={16} /> Set API Key to Start Chatting
+              </button>
+            ) : (
             <div className="relative group">
               <input 
                 ref={aiInputRef}
@@ -8060,6 +8123,7 @@ Respond ONLY with a JSON object like this, no other text:
                 <Send size={18} />
               </button>
             </div>
+            )}
           </div>
         </div>
       </BottomSheet>
@@ -8089,6 +8153,7 @@ Respond ONLY with a JSON object like this, no other text:
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
+          'x-api-key': anthropicApiKey,
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
