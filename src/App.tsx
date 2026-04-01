@@ -1668,7 +1668,6 @@ export default function App() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentActiveLesson, setStudentActiveLesson] = useState<any>(null);
   const [studentLessons, setStudentLessons] = useState<any[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(false);
   const [studentLogs, setStudentLogs] = useState<any[]>([]);
   const [studentTransactions, setStudentTransactions] = useState<any[]>([]);
   const [studentProfile, setStudentProfile] = useState<any>({
@@ -1878,7 +1877,6 @@ export default function App() {
   // Student Journey Data Listener
   useEffect(() => {
     if (!currentUser || !isStudent || !userProfile) return;
-    setLessonsLoading(true);
     
     const lessonsQuery = query(
       collection(db, 'lessons'),
@@ -1896,7 +1894,6 @@ export default function App() {
       setStudentLessons(snap.docs.map(d => ({
         id: d.id, ...d.data()
       })));
-      setLessonsLoading(false);
     }, (error) => {
       if (error.code === 'failed-precondition') {
         const fallbackQ = query(
@@ -1906,7 +1903,6 @@ export default function App() {
         onSnapshot(fallbackQ, (snap) => {
           setStudentLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))
             .sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)));
-          setLessonsLoading(false);
         });
       } else {
         handleFirestoreError(error, OperationType.GET, 'lessons');
@@ -3184,7 +3180,7 @@ export default function App() {
               </motion.div>
             )}
             {studentView === 'journey' && (
-              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-full">
+              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <StudentJourneyView forcedDark={false} />
               </motion.div>
             )}
@@ -3538,15 +3534,8 @@ export default function App() {
   const StudentJourneyView = () => {
     const dark = false;
     
-    if (lessonsLoading) return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 pt-32 bg-[#F9F9F9]">
-        <div className="w-10 h-10 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
-        <p className="text-xs text-zinc-400 font-medium">Loading your journey...</p>
-      </div>
-    );
-
     if (studentLessons.length === 0) return (
-      <div className={`flex flex-col items-center justify-center min-h-screen gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
+      <div className={`flex flex-col items-center justify-center h-full gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
           <Music2 size={32} className={dark ? 'text-white/20' : 'text-zinc-300'} />
         </div>
@@ -3637,7 +3626,7 @@ export default function App() {
     });
     
     return (
-      <div className="min-h-screen px-5 pt-8 bg-[#F9F9F9] text-zinc-900 pb-32">
+      <div className="min-h-full px-5 pt-8 bg-[#F9F9F9] text-zinc-900 pb-32">
         {/* Header Area */}
         <div className="flex justify-between items-end mb-4">
           <div>
@@ -7116,34 +7105,39 @@ Known milestones: ${milestones}
 Respond ONLY with a JSON object like this, no other text:
 {"covered": "...", "focus": "..."}`;
 
+      const apiKey = (import.meta as any)?.env?.VITE_ANTHROPIC_KEY
+        || (typeof process !== 'undefined' && (process as any)?.env?.REACT_APP_ANTHROPIC_KEY)
+        || localStorage.getItem('nada_ak')
+        || '';
+
       try {
-        let raw = '';
+        if (!apiKey) throw new Error('No API key');
+
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true',
-            'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
+            'x-api-key': apiKey,
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 1000,
             system: systemPrompt,
             messages: [{ role: 'user', content: localBrainDump }],
           }),
         });
-        if (!res.ok) throw new Error(`${res.status}`);
-        const data = await res.json();
-        raw = data.content?.[0]?.text || '';
 
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const raw = data.content?.[0]?.text || '';
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
         setSessionCovered(parsed.covered || '');
         setSessionFocus(parsed.focus || '');
 
-        // Auto-tick first in-progress milestone if any
         if (selectedStudent.learningPath && selectedStudent.learningPath.length > 0) {
           const current = selectedStudent.learningPath.find(m => m.status === 'current');
           if (current) setSelectedMilestones([current.id]);
@@ -7928,25 +7922,59 @@ Respond ONLY with a JSON object like this, no other text:
 
     const prompts = isStudent ? studentPrompts : mentorPrompts;
 
+    const [showKeyInput, setShowKeyInput] = useState(false);
+    const [keyDraft, setKeyDraft] = useState('');
+    const hasKey = (() => { try { return !!localStorage.getItem('nada_ak'); } catch { return false; } })();
+
+    const saveKey = () => {
+      const k = keyDraft.trim();
+      if (!k) return;
+      try { localStorage.setItem('nada_ak', k); } catch {}
+      setKeyDraft('');
+      setShowKeyInput(false);
+    };
+
     return (
-      <BottomSheet 
-        isOpen={showAIBuddySheet} 
-        onClose={() => setShowAIBuddySheet(false)}
-      >
+      <BottomSheet isOpen={showAIBuddySheet} onClose={() => setShowAIBuddySheet(false)}>
         <div className="flex flex-col h-[75vh] bg-zinc-50/50">
-          {/* Header Info - Executive & Minimal */}
-          <div className="px-6 py-6 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 flex items-center justify-center text-harbour-500">
-                <Bot size={28} strokeWidth={1.5} />
+
+          {/* Header */}
+          <div className="px-6 py-5 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 flex items-center justify-center text-harbour-500">
+                <Bot size={26} strokeWidth={1.5} />
               </div>
-              <div>
-                <h3 className="text-lg font-serif-sturdy tracking-tight text-white">
-                  {isStudent ? "Music Companion" : "Teaching Assistant"}
-                </h3>
-              </div>
+              <h3 className="text-lg font-serif-sturdy tracking-tight">
+                {isStudent ? 'Music Companion' : 'Teaching Assistant'}
+              </h3>
             </div>
+            <button
+              onClick={() => { setKeyDraft(''); setShowKeyInput(v => !v); }}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${hasKey ? 'bg-harbour-500/20 text-harbour-400' : 'bg-red-500/20 text-red-400'}`}
+              title="API Key"
+            >
+              <Settings size={14} />
+            </button>
           </div>
+
+          {/* Inline key input */}
+          {showKeyInput && (
+            <div className="px-4 py-3 bg-zinc-800 border-b border-white/10 space-y-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-white/40">Anthropic API Key</p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={keyDraft}
+                  onChange={e => setKeyDraft(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveKey()}
+                  placeholder="sk-ant-..."
+                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-harbour-500"
+                />
+                <button onClick={saveKey} className="px-4 py-2 bg-harbour-500 text-white text-xs font-bold rounded-xl whitespace-nowrap">Save</button>
+              </div>
+              <p className="text-[9px] text-white/30">Stored in your browser only. Get one free at console.anthropic.com</p>
+            </div>
+          )}
 
           {/* Chat Area - Clean & Professional */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
@@ -8091,15 +8119,26 @@ Respond ONLY with a JSON object like this, no other text:
     setAiBuddyMessages(newMessages);
     setIsAiBuddyTyping(true);
 
-    // Build context about the current user for the AI
     const userName = userProfile?.name || currentUser?.displayName || 'the user';
     const instrument = userProfile?.instrument || studentActiveLesson?.instrument || 'a traditional Malaysian instrument';
     const studentContext = isStudent
       ? `You are a warm, encouraging music companion inside NADA — a Malaysian traditional music learning app. The student's name is ${userName} and they are learning ${instrument}. Keep responses concise (3–5 sentences max), practical, and motivating. Use simple, friendly language. Do not use markdown bold or headers — plain text only.`
       : `You are a helpful teaching assistant inside NADA — a Malaysian traditional music mentoring app. The mentor's name is ${userName}. Their students include: ${realStudents.map(s => `${s.name} (${s.instrument}, ${s.stage})`).join(', ') || 'none yet'}. Keep responses concise, professional, and actionable. Do not use markdown bold or headers — plain text only.`;
 
-    // Build message history for multi-turn context
     const historyMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
+
+    // Read key from localStorage — set once via the gear icon in the sheet
+    let apiKey = '';
+    try { apiKey = localStorage.getItem('nada_ak') || ''; } catch {}
+
+    if (!apiKey) {
+      setAiBuddyMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '🔑 One-time setup: tap the ⚙ icon above, paste your Anthropic API key (sk-ant-...) and tap Save. You only do this once. Get a free key at console.anthropic.com'
+      }]);
+      setIsAiBuddyTyping(false);
+      return;
+    }
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -8108,27 +8147,38 @@ Respond ONLY with a JSON object like this, no other text:
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
+          'x-api-key': apiKey,
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 1000,
           system: studentContext,
           messages: historyMessages,
         }),
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `HTTP ${res.status}`);
+      }
+
       const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Hmm, I got an empty response. Please try again.';
+      const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding.';
       setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('AI Buddy error:', err);
-      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'I had trouble connecting. Please check your internet and try again.' }]);
+      setAiBuddyMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Could not connect: ${err?.message || 'unknown error'}. Check your API key using the ⚙ icon above.`
+      }]);
     } finally {
       setIsAiBuddyTyping(false);
     }
   };
 
+    if (!apiKey) {
+      setAiBuddyMessages(prev => [...prev, {
+        role: 'assistant',
   return (
     <div className={`h-screen font-sans transition-colors duration-500 overflow-hidden ${true ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'}`}>
       <div className="max-w-md mx-auto h-full relative overflow-hidden flex flex-col">
