@@ -3562,7 +3562,6 @@ export default function App() {
 
     // Use the dynamic user profile
     const currentStudent = userProfile || MOCK_STUDENTS[0];
-    const mentor = realMentors.find(m => m.id === studentLessons[0]?.mentorId) || MOCK_MENTORS[0];
 
     // Filter lessons by selected instrument tab
     const instrumentLessons = studentLessons.filter(l =>
@@ -3571,6 +3570,13 @@ export default function App() {
     const upcomingLesson = instrumentLessons.find(l =>
       (l.status === 'confirmed' || l.status === 'pending') && new Date(l.date) >= new Date()
     ) || instrumentLessons.find(l => l.status === 'confirmed' || l.status === 'pending');
+
+    // Look up mentor photo based on the upcoming lesson's mentorId — not a hardcoded first lesson
+    const upcomingMentor = upcomingLesson
+      ? (realMentors.find(m => m.id === upcomingLesson.mentorId) ||
+         MOCK_MENTORS.find(m => m.id === upcomingLesson.mentorId) ||
+         MOCK_MENTORS.find(m => m.name === upcomingLesson.mentorName))
+      : null;
 
     const activeInstruments = Array.from(new Set(studentLessons.map(l => l.instrument).filter(Boolean)));
     const instruments = activeInstruments.map(name => ({
@@ -3679,7 +3685,7 @@ export default function App() {
                 <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex gap-4 items-center">
-                      <Avatar name={upcomingLesson.mentorName} photo={mentor.photo} size="md" className="rounded-xl shadow-md" />
+                      <Avatar name={upcomingLesson.mentorName} photo={upcomingMentor?.photo} size="md" className="rounded-xl shadow-md" />
                       <div>
                         <h3 className="font-serif text-lg text-zinc-900">{upcomingLesson.mentorName}</h3>
                         <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{upcomingLesson.instrument} • Lesson #{studentLogs.length + 1}</p>
