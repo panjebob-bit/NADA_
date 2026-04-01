@@ -1668,6 +1668,7 @@ export default function App() {
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentActiveLesson, setStudentActiveLesson] = useState<any>(null);
   const [studentLessons, setStudentLessons] = useState<any[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(true);
   const [studentLogs, setStudentLogs] = useState<any[]>([]);
   const [studentTransactions, setStudentTransactions] = useState<any[]>([]);
   const [studentProfile, setStudentProfile] = useState<any>({
@@ -1894,6 +1895,7 @@ export default function App() {
       setStudentLessons(snap.docs.map(d => ({
         id: d.id, ...d.data()
       })));
+      setLessonsLoading(false);
     }, (error) => {
       if (error.code === 'failed-precondition') {
         const fallbackQ = query(
@@ -1903,6 +1905,7 @@ export default function App() {
         onSnapshot(fallbackQ, (snap) => {
           setStudentLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))
             .sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)));
+          setLessonsLoading(false);
         });
       } else {
         handleFirestoreError(error, OperationType.GET, 'lessons');
@@ -3534,6 +3537,13 @@ export default function App() {
   const StudentJourneyView = () => {
     const dark = false;
     
+    if (lessonsLoading) return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 pt-32 bg-[#F9F9F9]">
+        <div className="w-10 h-10 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
+        <p className="text-xs text-zinc-400 font-medium">Loading your journey...</p>
+      </div>
+    );
+
     if (studentLessons.length === 0) return (
       <div className={`flex flex-col items-center justify-center h-full gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
@@ -7107,33 +7117,24 @@ Respond ONLY with a JSON object like this, no other text:
 
       try {
         let raw = '';
-        try {
-          const response = await (window as any).claude.complete({
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+            'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
+          },
+          body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             system: systemPrompt,
             messages: [{ role: 'user', content: localBrainDump }],
-          });
-          raw = response?.content?.[0]?.text || '';
-        } catch {
-          const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'anthropic-version': '2023-06-01',
-              'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 1000,
-              system: systemPrompt,
-              messages: [{ role: 'user', content: localBrainDump }],
-            }),
-          });
-          if (!res.ok) throw new Error(`${res.status}`);
-          const data = await res.json();
-          raw = data.content?.[0]?.text || '';
-        }
+          }),
+        });
+        if (!res.ok) throw new Error(`${res.status}`);
+        const data = await res.json();
+        raw = data.content?.[0]?.text || '';
 
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
@@ -8100,39 +8101,28 @@ Respond ONLY with a JSON object like this, no other text:
     const historyMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const response = await (window as any).claude.complete({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: studentContext,
-        messages: historyMessages,
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: studentContext,
+          messages: historyMessages,
+        }),
       });
-      const reply = response?.content?.[0]?.text || 'Sorry, I had trouble responding. Please try again.';
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+      const reply = data.content?.[0]?.text || 'Hmm, I got an empty response. Please try again.';
       setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error('AI Buddy error:', err);
-      // Fallback: try direct fetch with proxy header
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1000,
-            system: studentContext,
-            messages: historyMessages,
-          }),
-        });
-        if (!res.ok) throw new Error(`${res.status}`);
-        const data = await res.json();
-        const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding.';
-        setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-      } catch (err2) {
-        setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not connect right now. Please try again.' }]);
-      }
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'I had trouble connecting. Please check your internet and try again.' }]);
     } finally {
       setIsAiBuddyTyping(false);
     }
