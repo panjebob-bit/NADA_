@@ -2346,11 +2346,13 @@ export default function App() {
         studentName: userProfile?.name || currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
         mentorId: selectedMentor.id,
         mentorName: selectedMentor.name,
+        mentorPhoto: selectedMentor.photo || '',
         instrument: selectedMentor.specialisation[0] || '',
-        date: bookingDate || '',
-        time: bookingTime || '',
+        date: bookingDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        time: bookingTime || '10:00 AM',
         type: type,
-        status: 'pending',
+        // Trial and paid bookings are auto-confirmed so the card shows immediately
+        status: 'confirmed',
         price: type === 'trial' ? 0 : 
                type === 'single' ? 60 : 
                selectedPackage?.price || 0,
@@ -2367,7 +2369,7 @@ export default function App() {
     }
   };
 
-  const handleSaveSession = async (coveredOverride?: string, focusOverride?: string) => {
+  const handleSaveSession = async () => {
     if (!selectedStudent || !selectedLesson || !currentUser) return;
 
     try {
@@ -2376,8 +2378,8 @@ export default function App() {
         mentorId: currentUser.uid,
         lessonNumber: selectedLesson.lessonNumber,
         date: new Date().toISOString().split('T')[0],
-        covered: coveredOverride ?? sessionCovered,
-        focus: focusOverride ?? sessionFocus,
+        covered: sessionCovered,
+        focus: sessionFocus,
         milestones: selectedMilestones,
         materials: [], // TODO: handle materials
         rating: sessionRating,
@@ -3198,7 +3200,8 @@ export default function App() {
         </div>
 
         {/* Bottom Nav */}
-        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && (
+        {/* Bottom Nav - hidden in chat and detail views */}
+        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
@@ -3307,9 +3310,9 @@ export default function App() {
         <div className="px-5 mt-8 space-y-8">
           <div className={`flex justify-between p-4 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             {[
-              { label: 'Students', value: selectedMentor.studentsCount, icon: Users },
-              { label: 'Reviews', value: selectedMentor.reviewCount, icon: MessageSquare },
-              { label: 'Experience', value: `${selectedMentor.experienceYears}y`, icon: Award }
+              { label: 'Students', value: selectedMentor.studentsCount || 24, icon: Users },
+              { label: 'Reviews', value: selectedMentor.reviewCount || 47, icon: MessageSquare },
+              { label: 'Experience', value: `${selectedMentor.experienceYears || 8}y`, icon: Award }
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>{stat.label}</p>
@@ -3558,14 +3561,7 @@ export default function App() {
 
     // Use the dynamic user profile
     const currentStudent = userProfile || MOCK_STUDENTS[0];
-    const mentor = realMentors.find(m => m.id === studentLessons[0]?.mentorId) || MOCK_MENTORS[0];
 
-    const upcomingLesson = studentLessons.find(l => 
-      l.status === 'confirmed' && 
-      new Date(l.date) >= new Date() &&
-      (l.instrument === selectedInstrumentJourney || !l.instrument)
-    );
-    
     // Dynamic instruments based on student's active lessons
     const activeInstruments = Array.from(new Set(studentLessons.map(l => l.instrument).filter(Boolean)));
     const instruments = activeInstruments.map(name => ({
@@ -3577,6 +3573,24 @@ export default function App() {
     if (instruments.length === 0) {
       instruments.push({ id: 'gambus', name: 'Gambus', icon: Music2 });
     }
+
+    // All booked lessons for the currently selected instrument tab (confirmed or pending)
+    const instrumentBookedLessons = studentLessons
+      .filter(l => (l.status === 'confirmed' || l.status === 'pending'))
+      .filter(l => !selectedInstrumentJourney || l.instrument === selectedInstrumentJourney || !l.instrument)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Deduplicate by mentorId — one card per mentor per instrument
+    const uniqueMentorLessons = instrumentBookedLessons.reduce((acc: any[], lesson: any) => {
+      const exists = acc.find(l => l.mentorId === lesson.mentorId);
+      if (!exists) acc.push(lesson);
+      return acc;
+    }, []);
+
+    // For the "next upcoming" highlight (first future lesson)
+    const upcomingLesson = instrumentBookedLessons.find(l => 
+      new Date(l.date) >= new Date(new Date().setHours(0,0,0,0))
+    ) || instrumentBookedLessons[0];
     
     const stats = {
       status: 'On Track',
@@ -3584,15 +3598,17 @@ export default function App() {
     };
 
     // Map logs to a more detailed format for the UI
-    const pastLessons = studentLogs.map((log, index) => ({
-      id: log.lessonNumber,
-      date: new Date(log.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      review: log.covered,
-      focus: log.focus,
-      milestones: log.milestones || [],
-      encouragement: "Solid progress today.",
-      isLatest: index === 0
-    })).sort((a, b) => b.id - a.id);
+    const pastLessons = studentLogs
+      .filter(l => !selectedInstrumentJourney || true) // show all logs for now
+      .map((log, index) => ({
+        id: log.lessonNumber,
+        date: new Date(log.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        review: log.covered,
+        focus: log.focus,
+        milestones: log.milestones || [],
+        encouragement: "Solid progress today.",
+        isLatest: index === 0
+      })).sort((a, b) => b.id - a.id);
 
     const studentProfile_lp = (currentStudent as any)?.learningPath;
     const hasLearningPath = Array.isArray(studentProfile_lp) && studentProfile_lp.length > 0;
@@ -3664,70 +3680,139 @@ export default function App() {
 
         {journeyTab === 'lessons' ? (
           <div className="space-y-10 pb-20">
-            {/* Upcoming Session Card */}
+            {/* Booked Sessions — one card per mentor per instrument */}
             <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Upcoming Session</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                  {selectedInstrumentJourney} Schedule
+                </h2>
+                <span className="text-[9px] font-bold text-teal-500">{uniqueMentorLessons.length} booked</span>
               </div>
 
-              {upcomingLesson ? (
-                <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex gap-4 items-center">
-                      <Avatar name={upcomingLesson.mentorName} photo={mentor.photo} size="md" className="rounded-xl shadow-md" />
-                      <div>
-                        <h3 className="font-serif text-lg text-zinc-900">{upcomingLesson.mentorName}</h3>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{upcomingLesson.instrument} • Lesson #{studentLogs.length + 1}</p>
-                      </div>
-                    </div>
-                    <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-                      <Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
-                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Date & Time</p>
-                      <p className="text-xs font-bold text-zinc-900">{new Date(upcomingLesson.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} • {upcomingLesson.time}</p>
-                    </div>
-                    <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
-                      <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Location</p>
-                      <p className="text-xs font-bold text-zinc-900 truncate">{upcomingLesson.location || 'Bangsar Studio'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => setShowRescheduleModal(true)}
-                      className="flex-1 py-4 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full shadow-lg shadow-black/10 transition-transform active:scale-95"
-                    >
-                      Reschedule
-                    </button>
-                    <button className="flex-1 py-4 border border-zinc-200 text-zinc-900 text-[10px] font-bold uppercase tracking-widest rounded-full transition-colors hover:bg-zinc-50 active:scale-95">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white border border-zinc-100 border-dashed rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center gap-4">
+              {uniqueMentorLessons.length === 0 ? (
+                <div className="bg-white border border-dashed border-zinc-200 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-300">
                     <Calendar size={24} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-zinc-900">No upcoming sessions</p>
-                    <p className="text-[10px] text-zinc-400 mt-1">Ready to continue your journey?</p>
+                    <p className="text-sm font-bold text-zinc-900">No sessions booked</p>
+                    <p className="text-[10px] text-zinc-400 mt-1">Book a trial or package to see your schedule here</p>
                   </div>
                   <button 
                     onClick={() => switchStudentTab('home')}
                     className="px-6 py-3 bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-full"
                   >
-                    Book a Session
+                    Find a Mentor
                   </button>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  {uniqueMentorLessons.map((lesson: any) => {
+                    // Get mentor details — try realMentors first, fallback to MOCK_MENTORS
+                    const mentorDetail = realMentors.find(m => m.id === lesson.mentorId) 
+                      || MOCK_MENTORS.find(m => m.id === lesson.mentorId);
+                    const mentorPhoto = lesson.mentorPhoto || mentorDetail?.photo || '';
+                    const mentorName = lesson.mentorName || mentorDetail?.name || 'Your Mentor';
+                    
+                    // Count total sessions booked with this mentor for this instrument
+                    const totalSessionsWithMentor = instrumentBookedLessons.filter(
+                      (l: any) => l.mentorId === lesson.mentorId
+                    ).length;
+
+                    // Next upcoming lesson date with this mentor
+                    const nextLesson = instrumentBookedLessons
+                      .filter((l: any) => l.mentorId === lesson.mentorId)
+                      .find((l: any) => new Date(l.date) >= new Date(new Date().setHours(0,0,0,0)))
+                      || lesson;
+
+                    const daysAway = Math.ceil(
+                      (new Date(nextLesson.date).getTime() - new Date().getTime()) / 86400000
+                    );
+                    const isNextLesson = nextLesson.id === upcomingLesson?.id;
+
+                    return (
+                      <div key={lesson.id} className={`bg-white border rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden ${isNextLesson ? 'border-teal-200 shadow-teal-500/10' : 'border-zinc-100'}`}>
+                        {/* Instrument accent stripe */}
+                        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[2.5rem] bg-gradient-to-r from-teal-500 to-teal-400 opacity-60" />
+                        
+                        {/* Mentor info */}
+                        <div className="flex justify-between items-start mb-5">
+                          <div className="flex gap-4 items-center">
+                            <div className="relative">
+                              <Avatar name={mentorName} photo={mentorPhoto} size="md" className="rounded-2xl shadow-lg" />
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-teal-500 border-2 border-white rounded-full" />
+                            </div>
+                            <div>
+                              <h3 className="font-serif-sturdy text-base text-zinc-900 leading-tight">{mentorName}</h3>
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-teal-600 mt-0.5">{lesson.instrument}</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">
+                                {totalSessionsWithMentor} session{totalSessionsWithMentor !== 1 ? 's' : ''} booked
+                              </p>
+                            </div>
+                          </div>
+                          <div className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${lesson.type === 'Trial' || lesson.type === 'trial' ? 'bg-amber-100 text-amber-700' : 'bg-teal-500 text-white'}`}>
+                            {lesson.type === 'Trial' || lesson.type === 'trial' ? '⭐ Trial' : `${totalSessionsWithMentor}x Booked`}
+                          </div>
+                        </div>
+
+                        {/* Next session details */}
+                        <div className="grid grid-cols-3 gap-2 mb-5">
+                          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100 col-span-1">
+                            <p className="text-[7px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Next Date</p>
+                            <p className="text-[10px] font-bold text-zinc-900 leading-tight">
+                              {nextLesson.date 
+                                ? new Date(nextLesson.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) 
+                                : 'TBD'}
+                            </p>
+                          </div>
+                          <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100 col-span-1">
+                            <p className="text-[7px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Time</p>
+                            <p className="text-[10px] font-bold text-zinc-900 leading-tight">{nextLesson.time || 'TBD'}</p>
+                          </div>
+                          <div className={`p-3 rounded-2xl border col-span-1 ${daysAway <= 3 ? 'bg-teal-50 border-teal-100' : 'bg-zinc-50 border-zinc-100'}`}>
+                            <p className="text-[7px] font-bold uppercase tracking-widest text-zinc-400 mb-1">In</p>
+                            <p className={`text-[10px] font-bold leading-tight ${daysAway <= 3 ? 'text-teal-600' : 'text-zinc-900'}`}>
+                              {daysAway > 0 ? `${daysAway}d` : daysAway === 0 ? 'Today' : 'Soon'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Status badge */}
+                        <div className={`flex items-center gap-2 mb-5 px-3 py-2 rounded-xl ${lesson.status === 'confirmed' ? 'bg-teal-50' : 'bg-amber-50'}`}>
+                          <div className={`w-2 h-2 rounded-full ${lesson.status === 'confirmed' ? 'bg-teal-500' : 'bg-amber-500'}`} />
+                          <p className={`text-[9px] font-bold uppercase tracking-widest ${lesson.status === 'confirmed' ? 'text-teal-700' : 'text-amber-700'}`}>
+                            {lesson.status === 'confirmed' ? 'Confirmed — You\'re all set!' : 'Pending mentor confirmation'}
+                          </p>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => {
+                              if (mentorDetail) {
+                                handleStartConversation(lesson.mentorId, mentorName, mentorPhoto);
+                                switchStudentTab('messages');
+                              }
+                            }}
+                            className="w-11 h-11 rounded-2xl flex items-center justify-center border border-zinc-200 text-zinc-500 hover:bg-zinc-50 transition-colors"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                          <button 
+                            onClick={() => setShowRescheduleModal(true)}
+                            className="flex-1 py-3 bg-zinc-900 text-white text-[9px] font-bold uppercase tracking-widest rounded-2xl active:scale-95 transition-transform"
+                          >
+                            Reschedule
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-            </section>
 
             {/* Past Lessons Log */}
+            </section>
             <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Past Lessons Log</h2>
@@ -4036,7 +4121,7 @@ export default function App() {
           ))}
         </div>
 
-        <div className={`p-4 border-t flex-shrink-0 ${dark ? 'border-white/10 bg-zinc-900' : 'border-zinc-100 bg-white'}`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className={`p-5 pb-10 border-t ${dark ? 'border-white/10' : 'border-zinc-100'}`}>
           <div className="relative">
             <input 
               ref={inputRef}
@@ -5671,10 +5756,7 @@ export default function App() {
     const [rosterFilter, setRosterFilter] = useState('All');
     const [rosterSearch, setRosterSearch] = useState('');
     
-    // Only show students who have actually booked a session with this mentor
-    const bookedStudentIds = new Set(lessons.map(l => l.studentId));
     const filteredStudents = (realStudents.length > 0 ? realStudents : MOCK_STUDENTS)
-      .filter(s => bookedStudentIds.has(s.id))
       .filter(s => rosterFilter === 'All' || s.package === rosterFilter || 
         (rosterFilter === 'Package' && (s.package === 'Package 8' || s.package === 'Package 12')))
       .filter(s => s.name.toLowerCase().includes(rosterSearch.toLowerCase()));
@@ -7063,18 +7145,8 @@ export default function App() {
   const LogSessionView = () => {
     if (!selectedStudent || !selectedLesson) return null;
 
-    // Local state for inputs to prevent typing lag from outer state re-renders
-    const [localCovered, setLocalCovered] = React.useState(sessionCovered);
-    const [localFocus, setLocalFocus] = React.useState(sessionFocus);
-    const [localBrainDump, setLocalBrainDump] = React.useState('');
-
-    // Sync local state when outer state changes (e.g. after AI generate)
-    React.useEffect(() => { setLocalCovered(sessionCovered); }, [sessionCovered]);
-    React.useEffect(() => { setLocalFocus(sessionFocus); }, [sessionFocus]);
-
     const handleAIGenerate = async () => {
-      if (!localBrainDump) return;
-      setAiBrainDump(localBrainDump);
+      if (!aiBrainDump) return;
       setIsGenerating(true);
 
       const studentName = selectedStudent.name;
@@ -7097,12 +7169,16 @@ Respond ONLY with a JSON object like this, no other text:
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             system: systemPrompt,
-            messages: [{ role: 'user', content: localBrainDump }],
+            messages: [{ role: 'user', content: aiBrainDump }],
           }),
         });
 
@@ -7123,22 +7199,18 @@ Respond ONLY with a JSON object like this, no other text:
       } catch (err) {
         console.error('AI Generate error:', err);
         // Graceful fallback: split brain dump roughly
-        const sentences = localBrainDump.split('.').filter(s => s.trim().length > 0);
+        const sentences = aiBrainDump.split('.').filter(s => s.trim().length > 0);
         setSessionCovered(sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.');
         setSessionFocus(sentences.slice(Math.ceil(sentences.length / 2)).join('. ') + '.');
       } finally {
         setIsGenerating(false);
         setShowAIGenerateSheet(false);
-        setLocalBrainDump('');
         setAiBrainDump('');
       }
     };
 
     const handleSave = () => {
-      // Pass local textarea values directly to avoid async setState timing issues
-      setSessionCovered(localCovered);
-      setSessionFocus(localFocus);
-      handleSaveSession(localCovered, localFocus);
+      handleSaveSession();
       setSessionSaveSuccess(true);
       setTimeout(() => {
         setSessionSaveSuccess(false);
@@ -7244,9 +7316,8 @@ Respond ONLY with a JSON object like this, no other text:
             <div className="space-y-2">
               <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">What did you cover?</label>
               <textarea 
-                value={localCovered}
-                onChange={(e) => setLocalCovered(e.target.value)}
-                onBlur={() => setSessionCovered(localCovered)}
+                value={sessionCovered}
+                onChange={(e) => setSessionCovered(e.target.value)}
                 className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900 leading-relaxed"
                 placeholder="Topics taught, techniques explored..."
               />
@@ -7256,9 +7327,8 @@ Respond ONLY with a JSON object like this, no other text:
             <div className="space-y-2">
               <label className="text-[9px] uppercase tracking-widest font-bold text-zinc-400">Practice focus for next session</label>
               <textarea 
-                value={localFocus}
-                onChange={(e) => setLocalFocus(e.target.value)}
-                onBlur={() => setSessionFocus(localFocus)}
+                value={sessionFocus}
+                onChange={(e) => setSessionFocus(e.target.value)}
                 className="w-full bg-amber-50/30 border border-amber-100/50 rounded-2xl p-4 text-xs min-h-[80px] focus:outline-none text-zinc-900 italic"
                 placeholder="What should the student work on?"
               />
@@ -7329,16 +7399,16 @@ Respond ONLY with a JSON object like this, no other text:
               Type a quick brain dump of what happened in the lesson. AI will structure it into a beautiful log for your student.
             </p>
             <textarea 
-              value={localBrainDump}
-              onChange={(e) => setLocalBrainDump(e.target.value)}
+              value={aiBrainDump}
+              onChange={(e) => setAiBrainDump(e.target.value)}
               className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl p-4 text-xs min-h-[120px] focus:outline-none text-zinc-900"
               placeholder="e.g. Sarah did great today. We finished the D major scale and started the first page of Zapin Melayu. She needs to work on her thumb position."
             />
             <button 
               onClick={handleAIGenerate}
-              disabled={isGenerating || !localBrainDump}
+              disabled={isGenerating || !aiBrainDump}
               className={`w-full py-4 rounded-2xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
-                isGenerating || !localBrainDump ? 'bg-zinc-100 text-zinc-400' : 'bg-harbour-600 text-white shadow-lg'
+                isGenerating || !aiBrainDump ? 'bg-zinc-100 text-zinc-400' : 'bg-harbour-600 text-white shadow-lg'
               }`}
             >
               {isGenerating ? (
@@ -7383,10 +7453,6 @@ Respond ONLY with a JSON object like this, no other text:
       });
       setSelectedStudent({ ...selectedStudent, learningPath: newPath });
     };
-
-    // Local state for private notes editing — prevents lag
-    const [isEditingNotes, setIsEditingNotes] = React.useState(false);
-    const [localNotes, setLocalNotes] = React.useState(selectedStudent.privateNotes || '');
 
     const VisibilityBadge = ({ type }: { type: 'student' | 'mentor' }) => (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-wider ${
@@ -7470,52 +7536,13 @@ Respond ONLY with a JSON object like this, no other text:
               <div className="absolute top-0 right-0 p-3 opacity-10">
                 <Lock size={40} className="text-amber-900" />
               </div>
-              {isEditingNotes ? (
-                <>
-                  <textarea
-                    value={localNotes}
-                    onChange={(e) => setLocalNotes(e.target.value)}
-                    autoFocus
-                    className="w-full bg-white/60 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-3 focus:outline-none focus:border-amber-400 min-h-[100px] resize-none"
-                    placeholder="Add private notes about this student..."
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => { setIsEditingNotes(false); setLocalNotes(selectedStudent.privateNotes || ''); }}
-                        className="text-[9px] font-bold text-amber-600/60 px-3 py-1 rounded-full border border-amber-200"
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedStudent({ ...selectedStudent, privateNotes: localNotes });
-                          setIsEditingNotes(false);
-                        }}
-                        className="text-[9px] font-bold text-white bg-amber-600 px-3 py-1 rounded-full"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-4">
-                    {localNotes || selectedStudent.privateNotes || 'No private notes yet. Tap Edit to add your observations.'}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
-                    <button 
-                      onClick={() => setIsEditingNotes(true)}
-                      className="text-[9px] font-bold text-amber-700 underline underline-offset-2"
-                    >
-                      Edit Notes
-                    </button>
-                  </div>
-                </>
-              )}
+              <p className="text-xs text-amber-900 leading-relaxed italic font-serif-curvy mb-4">
+                "Sarah responds really well to visual metaphors. She's struggling with the bridge section of 'Zapin Melayu' but her finger strength has improved significantly. Remind her to keep her thumb relaxed during the faster passages."
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600/60">Only visible to you</span>
+                <button className="text-[9px] font-bold text-amber-700 underline underline-offset-2">Edit Notes</button>
+              </div>
             </div>
           </section>
 
@@ -7713,45 +7740,37 @@ Respond ONLY with a JSON object like this, no other text:
           title="Add New Stage"
           dark={false}
         >
-          {(() => {
-            const MilestoneForm = () => {
-              const [localTitle, setLocalTitle] = React.useState('');
-              return (
-                <div className="px-6 pb-10 space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Stage Title</label>
-                    <input 
-                      type="text" 
-                      autoFocus
-                      value={localTitle}
-                      onChange={(e) => setLocalTitle(e.target.value)}
-                      placeholder="e.g. Advanced Finger Picking"
-                      className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <button 
-                    onClick={() => {
-                      if (!localTitle) return;
-                      const newMilestone: Milestone = {
-                        id: 'm' + Date.now(),
-                        title: localTitle,
-                        status: 'upcoming'
-                      };
-                      setSelectedStudent({
-                        ...selectedStudent,
-                        learningPath: [...(selectedStudent.learningPath || []), newMilestone]
-                      });
-                      setShowAddMilestoneSheet(false);
-                    }}
-                    className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
-                  >
-                    Add Stage
-                  </button>
-                </div>
-              );
-            };
-            return <MilestoneForm />;
-          })()}
+          <div className="px-6 pb-10 space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Stage Title</label>
+              <input 
+                type="text" 
+                value={newMilestoneTitle}
+                onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                placeholder="e.g. Advanced Finger Picking"
+                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+              />
+            </div>
+            <button 
+              onClick={() => {
+                if (!newMilestoneTitle) return;
+                const newMilestone: Milestone = {
+                  id: 'm' + Date.now(),
+                  title: newMilestoneTitle,
+                  status: 'upcoming'
+                };
+                setSelectedStudent({
+                  ...selectedStudent,
+                  learningPath: [...(selectedStudent.learningPath || []), newMilestone]
+                });
+                setNewMilestoneTitle('');
+                setShowAddMilestoneSheet(false);
+              }}
+              className="w-full py-5 bg-zinc-900 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+            >
+              Add Stage
+            </button>
+          </div>
         </BottomSheet>
 
         {/* Add Material Bottom Sheet */}
@@ -7761,55 +7780,48 @@ Respond ONLY with a JSON object like this, no other text:
           title="Upload Material"
           dark={false}
         >
-          {(() => {
-            const MaterialForm = () => {
-              const [localTitle, setLocalTitle] = React.useState('');
-              const [localType, setLocalType] = React.useState<'PDF' | 'Guide' | 'Notes'>('PDF');
-              return (
-                <div className="px-6 pb-10 space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Material Title</label>
-                    <input 
-                      type="text" 
-                      autoFocus
-                      value={localTitle}
-                      onChange={(e) => setLocalTitle(e.target.value)}
-                      placeholder="e.g. Scale Exercises PDF"
-                      className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Type</label>
-                    <div className="flex gap-2">
-                      {(['PDF', 'Guide', 'Notes'] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setLocalType(type)}
-                          className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${
-                            localType === type
-                              ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' 
-                              : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      if (!localTitle) return;
-                      setShowAddMaterialSheet(false);
-                    }}
-                    className="w-full py-5 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+          <div className="px-6 pb-10 space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Material Title</label>
+              <input 
+                type="text" 
+                value={newMaterialTitle}
+                onChange={(e) => setNewMaterialTitle(e.target.value)}
+                placeholder="e.g. Scale Exercises PDF"
+                className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-[1.5rem] text-sm font-medium focus:outline-none focus:ring-4 ring-zinc-900/5 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 ml-1">Type</label>
+              <div className="flex gap-2">
+                {(['PDF', 'Guide', 'Notes'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setNewMaterialType(type)}
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-bold border transition-all ${
+                      (newMaterialType as string) === (type as string)
+                        ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' 
+                        : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
+                    }`}
                   >
-                    Upload Material
+                    {type}
                   </button>
-                </div>
-              );
-            };
-            return <MaterialForm />;
-          })()}
+                ))}
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                if (!newMaterialTitle) return;
+                // In a real app we'd update MOCK_MATERIALS or a stateful equivalent
+                // For now we'll just close the sheet
+                setNewMaterialTitle('');
+                setShowAddMaterialSheet(false);
+              }}
+              className="w-full py-5 bg-teal-600 text-white text-sm font-bold rounded-full shadow-2xl transition-transform active:scale-95"
+            >
+              Upload Material
+            </button>
+          </div>
         </BottomSheet>
 
         {/* Sticky Bottom Bar */}
@@ -8076,7 +8088,11 @@ Respond ONLY with a JSON object like this, no other text:
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
@@ -8085,7 +8101,10 @@ Respond ONLY with a JSON object like this, no other text:
         }),
       });
 
-      if (!response.ok) throw new Error(`API error ${response.status}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API error ${response.status}: ${errText}`);
+      }
       const data = await response.json();
       const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding. Please try again.';
       setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
@@ -8267,8 +8286,7 @@ Respond ONLY with a JSON object like this, no other text:
             </motion.main>
           </AnimatePresence>
 
-          {/* Mobile Nav - hidden on detail/session pages */}
-          {view !== 'student-detail' && view !== 'log-session' && (
+          {/* Mobile Nav */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
@@ -8302,7 +8320,6 @@ Respond ONLY with a JSON object like this, no other text:
               ))}
             </div>
           </div>
-          )}
         </>
       )}
 
