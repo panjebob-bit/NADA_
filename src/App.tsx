@@ -2350,7 +2350,7 @@ export default function App() {
         date: bookingDate || '',
         time: bookingTime || '',
         type: type,
-        status: type === 'trial' ? 'confirmed' : 'pending',
+        status: 'pending',
         price: type === 'trial' ? 0 : 
                type === 'single' ? 60 : 
                selectedPackage?.price || 0,
@@ -2869,7 +2869,7 @@ export default function App() {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400">
                       <Star size={12} fill="currentColor" />
-                      {mentor.rating || '4.9'}
+                      {mentor.rating}
                     </div>
                     <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
                       <MapPin size={12} />
@@ -3162,7 +3162,7 @@ export default function App() {
             <div className="absolute top-[20%] left-[10%] w-[60%] h-[60%] bg-pine-dark/10 blur-[120px] rounded-full" />
           </div>
         )}
-        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat ? 'pb-24' : ''}`}>
+        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) ? 'pb-24' : ''}`}>
           <AnimatePresence mode="wait">
             {studentView === 'home' && (
               <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -3198,7 +3198,7 @@ export default function App() {
         </div>
 
         {/* Bottom Nav */}
-        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat && (
+        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
             <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
               {[
@@ -3294,7 +3294,7 @@ export default function App() {
               <h1 className={`text-2xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>{selectedMentor.name}</h1>
               <div className="flex items-center gap-3 mt-1">
                 <div className="flex items-center gap-1 text-xs font-bold text-amber-400">
-                  <Star size={12} fill="currentColor" /> {selectedMentor.rating || 4.9}
+                  <Star size={12} fill="currentColor" /> {selectedMentor.rating}
                 </div>
                 <div className={`flex items-center gap-1 text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
                   <MapPin size={12} /> {selectedMentor.location}
@@ -3307,9 +3307,9 @@ export default function App() {
         <div className="px-5 mt-8 space-y-8">
           <div className={`flex justify-between p-4 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
             {[
-              { label: 'Students', value: selectedMentor.studentsCount || 24, icon: Users },
-              { label: 'Reviews', value: selectedMentor.reviewCount || 47, icon: MessageSquare },
-              { label: 'Experience', value: `${selectedMentor.experienceYears || 8}y`, icon: Award }
+              { label: 'Students', value: selectedMentor.studentsCount, icon: Users },
+              { label: 'Reviews', value: selectedMentor.reviewCount, icon: MessageSquare },
+              { label: 'Experience', value: `${selectedMentor.experienceYears}y`, icon: Award }
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>{stat.label}</p>
@@ -3558,22 +3558,15 @@ export default function App() {
 
     // Use the dynamic user profile
     const currentStudent = userProfile || MOCK_STUDENTS[0];
+    const mentor = realMentors.find(m => m.id === studentLessons[0]?.mentorId) || MOCK_MENTORS[0];
 
-    // Filter lessons by selected instrument tab
-    const instrumentLessons = studentLessons.filter(l =>
-      !selectedInstrumentJourney || l.instrument === selectedInstrumentJourney || !l.instrument
+    const upcomingLesson = studentLessons.find(l => 
+      l.status === 'confirmed' && 
+      new Date(l.date) >= new Date() &&
+      (l.instrument === selectedInstrumentJourney || !l.instrument)
     );
-    const upcomingLesson = instrumentLessons.find(l =>
-      (l.status === 'confirmed' || l.status === 'pending') && new Date(l.date) >= new Date()
-    ) || instrumentLessons.find(l => l.status === 'confirmed' || l.status === 'pending');
-
-    // Look up mentor photo based on the upcoming lesson's mentorId — not a hardcoded first lesson
-    const upcomingMentor = upcomingLesson
-      ? (realMentors.find(m => m.id === upcomingLesson.mentorId) ||
-         MOCK_MENTORS.find(m => m.id === upcomingLesson.mentorId) ||
-         MOCK_MENTORS.find(m => m.name === upcomingLesson.mentorName))
-      : null;
-
+    
+    // Dynamic instruments based on student's active lessons
     const activeInstruments = Array.from(new Set(studentLessons.map(l => l.instrument).filter(Boolean)));
     const instruments = activeInstruments.map(name => ({
       id: (name as string).toLowerCase(),
@@ -3681,18 +3674,14 @@ export default function App() {
                 <div className="bg-white border border-zinc-100 rounded-[2.5rem] p-6 shadow-xl shadow-teal-500/5 relative overflow-hidden">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex gap-4 items-center">
-                      <Avatar name={upcomingLesson.mentorName} photo={upcomingMentor?.photo} size="md" className="rounded-xl shadow-md" />
+                      <Avatar name={upcomingLesson.mentorName} photo={mentor.photo} size="md" className="rounded-xl shadow-md" />
                       <div>
                         <h3 className="font-serif text-lg text-zinc-900">{upcomingLesson.mentorName}</h3>
                         <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">{upcomingLesson.instrument} • Lesson #{studentLogs.length + 1}</p>
                       </div>
                     </div>
-                    <div className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${upcomingLesson.status === 'pending' ? 'bg-amber-500 text-white' : 'bg-teal-500 text-white'}`}>
-                      {upcomingLesson.status === 'pending' ? (
-                        <><Clock size={10} /> Awaiting Confirmation</>
-                      ) : (
-                        <><Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away</>
-                      )}
+                    <div className="bg-teal-500 text-white px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                      <Clock size={10} /> {Math.ceil((new Date(upcomingLesson.date).getTime() - new Date().getTime()) / 86400000)} Days Away
                     </div>
                   </div>
 
@@ -7105,32 +7094,20 @@ Known milestones: ${milestones}
 Respond ONLY with a JSON object like this, no other text:
 {"covered": "...", "focus": "..."}`;
 
-      const apiKey = (import.meta as any)?.env?.VITE_ANTHROPIC_KEY
-        || (typeof process !== 'undefined' && (process as any)?.env?.REACT_APP_ANTHROPIC_KEY)
-        || localStorage.getItem('nada_ak')
-        || '';
-
       try {
-        if (!apiKey) throw new Error('No API key');
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'x-api-key': apiKey,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             system: systemPrompt,
             messages: [{ role: 'user', content: localBrainDump }],
           }),
         });
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        if (!response.ok) throw new Error(`API error ${response.status}`);
+        const data = await response.json();
         const raw = data.content?.[0]?.text || '';
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
@@ -7138,6 +7115,7 @@ Respond ONLY with a JSON object like this, no other text:
         setSessionCovered(parsed.covered || '');
         setSessionFocus(parsed.focus || '');
 
+        // Auto-tick first in-progress milestone if any
         if (selectedStudent.learningPath && selectedStudent.learningPath.length > 0) {
           const current = selectedStudent.learningPath.find(m => m.status === 'current');
           if (current) setSelectedMilestones([current.id]);
@@ -7922,59 +7900,25 @@ Respond ONLY with a JSON object like this, no other text:
 
     const prompts = isStudent ? studentPrompts : mentorPrompts;
 
-    const [showKeyInput, setShowKeyInput] = useState(false);
-    const [keyDraft, setKeyDraft] = useState('');
-    const hasKey = (() => { try { return !!localStorage.getItem('nada_ak'); } catch { return false; } })();
-
-    const saveKey = () => {
-      const k = keyDraft.trim();
-      if (!k) return;
-      try { localStorage.setItem('nada_ak', k); } catch {}
-      setKeyDraft('');
-      setShowKeyInput(false);
-    };
-
     return (
-      <BottomSheet isOpen={showAIBuddySheet} onClose={() => setShowAIBuddySheet(false)}>
+      <BottomSheet 
+        isOpen={showAIBuddySheet} 
+        onClose={() => setShowAIBuddySheet(false)}
+      >
         <div className="flex flex-col h-[75vh] bg-zinc-50/50">
-
-          {/* Header */}
-          <div className="px-6 py-5 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-white">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 flex items-center justify-center text-harbour-500">
-                <Bot size={26} strokeWidth={1.5} />
+          {/* Header Info - Executive & Minimal */}
+          <div className="px-6 py-6 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-white">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 flex items-center justify-center text-harbour-500">
+                <Bot size={28} strokeWidth={1.5} />
               </div>
-              <h3 className="text-lg font-serif-sturdy tracking-tight">
-                {isStudent ? 'Music Companion' : 'Teaching Assistant'}
-              </h3>
+              <div>
+                <h3 className="text-lg font-serif-sturdy tracking-tight text-white">
+                  {isStudent ? "Music Companion" : "Teaching Assistant"}
+                </h3>
+              </div>
             </div>
-            <button
-              onClick={() => { setKeyDraft(''); setShowKeyInput(v => !v); }}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${hasKey ? 'bg-harbour-500/20 text-harbour-400' : 'bg-red-500/20 text-red-400'}`}
-              title="API Key"
-            >
-              <Settings size={14} />
-            </button>
           </div>
-
-          {/* Inline key input */}
-          {showKeyInput && (
-            <div className="px-4 py-3 bg-zinc-800 border-b border-white/10 space-y-2">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-white/40">Anthropic API Key</p>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={keyDraft}
-                  onChange={e => setKeyDraft(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveKey()}
-                  placeholder="sk-ant-..."
-                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-harbour-500"
-                />
-                <button onClick={saveKey} className="px-4 py-2 bg-harbour-500 text-white text-xs font-bold rounded-xl whitespace-nowrap">Save</button>
-              </div>
-              <p className="text-[9px] text-white/30">Stored in your browser only. Get one free at console.anthropic.com</p>
-            </div>
-          )}
 
           {/* Chat Area - Clean & Professional */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
@@ -8119,66 +8063,40 @@ Respond ONLY with a JSON object like this, no other text:
     setAiBuddyMessages(newMessages);
     setIsAiBuddyTyping(true);
 
+    // Build context about the current user for the AI
     const userName = userProfile?.name || currentUser?.displayName || 'the user';
     const instrument = userProfile?.instrument || studentActiveLesson?.instrument || 'a traditional Malaysian instrument';
     const studentContext = isStudent
       ? `You are a warm, encouraging music companion inside NADA — a Malaysian traditional music learning app. The student's name is ${userName} and they are learning ${instrument}. Keep responses concise (3–5 sentences max), practical, and motivating. Use simple, friendly language. Do not use markdown bold or headers — plain text only.`
       : `You are a helpful teaching assistant inside NADA — a Malaysian traditional music mentoring app. The mentor's name is ${userName}. Their students include: ${realStudents.map(s => `${s.name} (${s.instrument}, ${s.stage})`).join(', ') || 'none yet'}. Keep responses concise, professional, and actionable. Do not use markdown bold or headers — plain text only.`;
 
+    // Build message history for multi-turn context
     const historyMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
 
-    // Read key from localStorage — set once via the gear icon in the sheet
-    let apiKey = '';
-    try { apiKey = localStorage.getItem('nada_ak') || ''; } catch {}
-
-    if (!apiKey) {
-      setAiBuddyMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '🔑 One-time setup: tap the ⚙ icon above, paste your Anthropic API key (sk-ant-...) and tap Save. You only do this once. Get a free key at console.anthropic.com'
-      }]);
-      setIsAiBuddyTyping(false);
-      return;
-    }
-
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-          'x-api-key': apiKey,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
           system: studentContext,
           messages: historyMessages,
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding.';
+      if (!response.ok) throw new Error(`API error ${response.status}`);
+      const data = await response.json();
+      const reply = data.content?.[0]?.text || 'Sorry, I had trouble responding. Please try again.';
       setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err: any) {
+    } catch (err) {
       console.error('AI Buddy error:', err);
-      setAiBuddyMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `Could not connect: ${err?.message || 'unknown error'}. Check your API key using the ⚙ icon above.`
-      }]);
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not connect right now. Please check your internet and try again.' }]);
     } finally {
       setIsAiBuddyTyping(false);
     }
   };
 
-    if (!apiKey) {
-      setAiBuddyMessages(prev => [...prev, {
-        role: 'assistant',
   return (
     <div className={`h-screen font-sans transition-colors duration-500 overflow-hidden ${true ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'}`}>
       <div className="max-w-md mx-auto h-full relative overflow-hidden flex flex-col">
