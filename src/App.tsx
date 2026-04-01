@@ -1879,42 +1879,33 @@ export default function App() {
   useEffect(() => {
     if (!currentUser || !isStudent || !userProfile) return;
     setLessonsLoading(true);
-    // Safety: never leave the user stuck on a spinner more than 5 seconds
     const loadingTimeout = setTimeout(() => setLessonsLoading(false), 5000);
-
-    // Use simple queries (no orderBy) to avoid needing composite Firestore indexes.
-    // We sort client-side instead.
-    const lessonsQuery = query(
-      collection(db, 'lessons'),
-      where('studentId', '==', currentUser.uid)
-    );
-
-    const logsQuery = query(
-      collection(db, 'sessionLogs'),
-      where('studentId', '==', currentUser.uid)
-    );
 
     const sortByDate = (a: any, b: any) =>
       (b.createdAt?.toDate?.() || b.createdAt || 0) -
       (a.createdAt?.toDate?.() || a.createdAt || 0);
 
-    const unsub1 = onSnapshot(lessonsQuery, (snap) => {
-      clearTimeout(loadingTimeout);
-      const lessons = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortByDate);
-      setStudentLessons(lessons);
-      setLessonsLoading(false);
-    }, (error) => {
-      clearTimeout(loadingTimeout);
-      console.error('Lessons listener error:', error);
-      setLessonsLoading(false);
-    });
+    const unsub1 = onSnapshot(
+      query(collection(db, 'lessons'), where('studentId', '==', currentUser.uid)),
+      (snap) => {
+        clearTimeout(loadingTimeout);
+        setStudentLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortByDate));
+        setLessonsLoading(false);
+      },
+      (error) => {
+        clearTimeout(loadingTimeout);
+        console.error('Lessons error:', error);
+        setLessonsLoading(false);
+      }
+    );
 
-    const unsub2 = onSnapshot(logsQuery, (snap) => {
-      const logs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortByDate);
-      setStudentLogs(logs);
-    }, (error) => {
-      console.error('Logs listener error:', error);
-    });
+    const unsub2 = onSnapshot(
+      query(collection(db, 'sessionLogs'), where('studentId', '==', currentUser.uid)),
+      (snap) => {
+        setStudentLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(sortByDate));
+      },
+      (error) => { console.error('Logs error:', error); }
+    );
 
     return () => { clearTimeout(loadingTimeout); unsub1(); unsub2(); };
   }, [currentUser, isStudent, userProfile]);
@@ -3128,407 +3119,9 @@ export default function App() {
     );
   };
 
-  const StudentDashboard = () => {
-    // Determine theme based on view
-    const getViewTheme = (view: StudentView) => {
-      if (view === 'home') return true; // Dark
-      if (view === 'journey') return false; // Light
-      if (view === 'messages') return true; // Dark
-      if (view === 'profile') return true; // User preference for profile
-      if (view === 'mentor-listing') return true; // Always Dark as requested
-      if (view === 'mentor-profile') return true; // Always Dark as requested
-      return true;
-    };
-
-    const currentViewIsDark = getViewTheme(studentView);
-
-    return (
-      <div className={`h-full flex flex-col transition-colors duration-500 relative overflow-hidden ${currentViewIsDark ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'}`}>
-        {currentViewIsDark && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute bottom-[-20%] right-[-10%] w-[80%] h-[80%] bg-seafoam-glow/20 blur-[150px] rounded-full" />
-            <div className="absolute top-[20%] left-[10%] w-[60%] h-[60%] bg-pine-dark/10 blur-[120px] rounded-full" />
-          </div>
-        )}
-        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat ? 'pb-24' : ''}`}>
-          <AnimatePresence mode="wait">
-            {studentView === 'home' && (
-              <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <StudentHomeView forcedDark={true} />
-              </motion.div>
-            )}
-            {studentView === 'mentor-listing' && (
-              <motion.div key="listing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <MentorListingView />
-              </motion.div>
-            )}
-            {studentView === 'mentor-profile' && (
-              <motion.div key="mentor-profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <MentorProfileView />
-              </motion.div>
-            )}
-            {studentView === 'journey' && (
-              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-full">
-                <StudentJourneyView forcedDark={false} />
-              </motion.div>
-            )}
-            {studentView === 'messages' && (
-              <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <StudentMessagesView forcedDark={true} />
-              </motion.div>
-            )}
-            {studentView === 'profile' && (
-              <motion.div key="profile-settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <StudentProfileView />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Bottom Nav */}
-        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
-            <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
-              {[
-                { id: 'home', icon: HomeIcon, label: 'Home' },
-                { id: 'journey', icon: Music2, label: 'Journey' },
-                { id: 'messages', icon: MessageSquare, label: 'Chat' },
-                { id: 'profile', icon: User, label: 'Profile' }
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => switchStudentTab(item.id as StudentView)}
-                  className={`relative flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-300 ${
-                    studentView === item.id 
-                      ? 'text-white' 
-                      : 'text-zinc-400 opacity-50 hover:opacity-100'
-                  }`}
-                >
-                  {studentView === item.id && (
-                    <motion.div 
-                      layoutId="activeNavStudent"
-                      className="absolute inset-0 rounded-2xl z-0 bg-white/10"
-                      transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
-                    />
-                  )}
-                  <div className="relative z-10 flex flex-col items-center gap-1">
-                    <item.icon size={18} strokeWidth={studentView === item.id ? 2.5 : 2} />
-                    <span className="text-[8px] font-bold uppercase tracking-[0.15em]">{item.label}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-  const MentorProfileView = () => {
-    const dark = true;
-
-    if (!selectedMentor) return null;
-
-    const mentorInstrument = MOCK_INSTRUMENTS.find(i => 
-      selectedMentor.specialisation.some(s => 
-        s.toLowerCase().includes(i.name.toLowerCase())
-      )
-    );
-    const coverImage = mentorInstrument?.photo || selectedMentor.photo;
-
-    return (
-      <div className={`${dark ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'} min-h-full`}>
-        <div className="relative h-64 overflow-hidden">
-          {selectedMentor.introVideoUrl ? (
-            <video
-              src={selectedMentor.introVideoUrl}
-              className="w-full h-full object-cover opacity-70"
-              autoPlay
-              muted
-              loop
-              playsInline
-              poster={coverImage}
-            />
-          ) : (
-            <img 
-              src={coverImage || null}
-              className="w-full h-full object-cover opacity-60" 
-              referrerPolicy="no-referrer" 
-            />
-          )}
-          <div className={`absolute inset-0 bg-gradient-to-t ${dark ? 'from-black' : 'from-white'} via-transparent to-transparent`} />
-          <button 
-            onClick={() => popStudentView()} 
-            className={`absolute top-12 left-5 w-10 h-10 backdrop-blur-xl rounded-full flex items-center justify-center border z-50 transition-all active:scale-90 ${dark ? 'bg-black/20 border-white/10 text-white hover:bg-black/40' : 'bg-white/20 border-black/5 text-zinc-900 hover:bg-white/40'}`}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          {selectedMentor.introVideoUrl && (
-            <button 
-              onClick={() => {
-                const vid = document.querySelector('video') as HTMLVideoElement;
-                if (vid) vid.muted = !vid.muted;
-              }}
-              className="absolute top-12 right-5 w-10 h-10 backdrop-blur-md bg-black/40 border border-white/10 rounded-full flex items-center justify-center text-white z-10"
-            >
-              <Volume2 size={16} />
-            </button>
-          )}
-          <div className="absolute bottom-6 left-5 flex items-end gap-4">
-            <div className="relative">
-              <Avatar name={selectedMentor.name} photo={selectedMentor.photo} size="xl" className={`rounded-[2rem] border-4 shadow-2xl ${dark ? 'border-black' : 'border-white'}`} />
-              {selectedMentor.isVerified && <div className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 ${dark ? 'bg-harbour-400 text-white border-black' : 'bg-harbour-500 text-white border-white'}`}><CheckCircle2 size={12} /></div>}
-            </div>
-            <div className="mb-2">
-              <h1 className={`text-2xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>{selectedMentor.name}</h1>
-              <div className="flex items-center gap-3 mt-1">
-                <div className="flex items-center gap-1 text-xs font-bold text-amber-400">
-                  <Star size={12} fill="currentColor" /> {selectedMentor.rating || 4.9}
-                </div>
-                <div className={`flex items-center gap-1 text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
-                  <MapPin size={12} /> {selectedMentor.location}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-5 mt-8 space-y-8">
-          <div className={`flex justify-between p-4 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
-            {[
-              { label: 'Students', value: selectedMentor.studentsCount || 24, icon: Users },
-              { label: 'Reviews', value: selectedMentor.reviewCount || 47, icon: MessageSquare },
-              { label: 'Experience', value: `${selectedMentor.experienceYears || 8}y`, icon: Award }
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>{stat.label}</p>
-                <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{stat.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Profile Completion Shimmer */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <span className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Profile Completion</span>
-              <span className={`text-[10px] font-bold ${dark ? 'text-harbour-400' : 'text-harbour-600'}`}>{calculateProfileProgress(selectedMentor)}%</span>
-            </div>
-            <div className={`h-1.5 w-full rounded-full overflow-hidden relative ${dark ? 'bg-white/10' : 'bg-black/5'}`}>
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${calculateProfileProgress(selectedMentor)}%` }}
-                className="h-full bg-harbour-500 relative"
-              >
-                <motion.div 
-                  animate={{ x: ['-100%', '100%'] }}
-                  transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2"
-                />
-              </motion.div>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => {
-              setSelectedChat(selectedMentor);
-              pushStudentView('messages');
-            }}
-            className={`w-full py-4 border rounded-2xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/5 text-zinc-900'}`}
-          >
-            <MessageSquare size={16} /> Send Message
-          </button>
-
-          <section>
-            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>About</h2>
-            <p className={`text-sm leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>{selectedMentor.about}</p>
-          </section>
-
-          <section>
-            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Specialisation</h2>
-            <div className="flex flex-wrap gap-2">
-              {selectedMentor.specialisation.map(s => <span key={s} className="px-3 py-1.5 bg-harbour-500/10 text-harbour-400 text-[10px] font-bold rounded-full border border-harbour-500/20">{s}</span>)}
-              {selectedMentor.teachingStyle.map(s => <span key={s} className={`px-3 py-1.5 border text-[10px] font-bold rounded-full ${dark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-black/5 text-zinc-500 border-black/5'}`}>{s}</span>)}
-            </div>
-          </section>
-
-          <section>
-            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Communication</h2>
-            <div className="flex flex-wrap gap-2">
-              {selectedMentor.languages.map(l => <span key={l} className={`px-3 py-1.5 border text-[10px] font-bold rounded-full ${dark ? 'bg-white/5 text-white/60 border-white/10' : 'bg-black/5 text-zinc-600 border-black/5'}`}>{l}</span>)}
-            </div>
-          </section>
-
-          {/* Expandable Sections */}
-          <div id="mentor-packages-section" className="space-y-4">
-            {[
-              { id: 'packages', label: 'Lesson Packages', icon: Music2 },
-              { id: 'path', label: 'Learning Path', icon: BookOpen },
-              { id: 'schedule', label: 'View Schedule', icon: Calendar },
-              { id: 'gallery', label: 'Gallery', icon: ImageIcon },
-              { id: 'reviews', label: 'Student Reviews', icon: Star },
-              { id: 'credentials', label: 'Credentials', icon: Award }
-            ].map((section) => (
-              <div key={section.id} id={`section-${section.id}`} className={`border-b pb-4 ${dark ? 'border-white/10' : 'border-black/5'}`}>
-                <button 
-                  onClick={(e) => {
-                    if (section.id === 'schedule') {
-                      setShowScheduleSheet(true);
-                    } else {
-                      const isExpanding = mentorProfileExpandedSection !== section.id;
-                      setMentorProfileExpandedSection(isExpanding ? section.id : null);
-                      if (isExpanding) {
-                        setTimeout(() => {
-                          document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 100);
-                      }
-                    }
-                  }}
-                  className="w-full flex items-center justify-between py-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <section.icon size={18} className={dark ? 'text-white/40' : 'text-zinc-400'} />
-                    <span className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{section.label}</span>
-                  </div>
-                  <motion.div animate={{ rotate: mentorProfileExpandedSection === section.id ? 180 : 0 }}>
-                    <ChevronRight size={16} className={dark ? 'text-white/20' : 'text-zinc-300'} />
-                  </motion.div>
-                </button>
-                <AnimatePresence>
-                  {mentorProfileExpandedSection === section.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className={`py-4 text-sm ${dark ? 'text-white/60' : 'text-zinc-600'}`}>
-                        {section.id === 'packages' && (
-                          <div className="grid gap-2">
-                            {selectedMentor.packages.map(pkg => (
-                              <button 
-                                key={pkg.id} 
-                                onClick={() => {
-                                  setSelectedPackage(pkg);
-                                  if (pkg.id === 'p1') {
-                                    setBookingType('single');
-                                  } else {
-                                    setBookingType('package');
-                                  }
-                                  setBookingStep(1);
-                                  setShowBookingSheet(true);
-                                }}
-                                className={`p-2.5 border rounded-xl flex justify-between items-center transition-all ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:bg-zinc-50'}`}
-                              >
-                                <div className="text-left">
-                                  <h4 className={`text-[11px] font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{pkg.name}</h4>
-                                  <p className={`text-[8px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
-                                    {pkg.lessons} Lessons {pkg.validityMonths ? `• ${pkg.validityMonths}m` : ''}
-                                  </p>
-                                </div>
-                                <p className={`text-[11px] font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>
-                                  {pkg.price === 0 ? 'FREE' : `RM ${pkg.price}`}
-                                </p>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {section.id === 'reviews' && (
-                          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                            {selectedMentor.reviews.map(review => (
-                              <div key={review.id} className={`min-w-[280px] p-5 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
-                                <div className="flex justify-between mb-3">
-                                  <div>
-                                    <h4 className={`font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{review.studentName}</h4>
-                                    <p className={`text-[10px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{review.lessonsTaken} lessons taken • {review.timeAgo}</p>
-                                  </div>
-                                  <div className="flex text-amber-400">
-                                    {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? 'currentColor' : 'none'} />)}
-                                  </div>
-                                </div>
-                                <p className={`text-xs italic leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>"{review.comment}"</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {section.id === 'credentials' && (
-                          <ul className="space-y-2">
-                            {selectedMentor.credentials.map(c => <li key={c} className="flex items-center gap-2 text-xs"><CheckCircle2 size={12} className="text-harbour-400" /> {c}</li>)}
-                          </ul>
-                        )}
-                        {section.id === 'gallery' && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {selectedMentor.gallery.map((img, i) => <img key={i} src={img || null} className="rounded-xl aspect-square object-cover" referrerPolicy="no-referrer" />)}
-                          </div>
-                        )}
-                        {section.id === 'path' && (
-                          <div className="relative pl-6 space-y-6">
-                            <div className={`absolute left-2 top-2 bottom-2 w-0.5 ${dark ? 'bg-white/10' : 'bg-black/5'}`} />
-                            {[
-                              { title: 'Foundations', desc: 'Basic techniques and posture' },
-                              { title: 'Intermediate', desc: 'Complex rhythms and scales' },
-                              { title: 'Advanced', desc: 'Performance pieces and improvisation' }
-                            ].map((stage, i) => (
-                              <div key={i} className="relative">
-                                <div className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-harbour-500 border-2 ${dark ? 'border-black' : 'border-white'}`} />
-                                <h4 className={`font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{stage.title}</h4>
-                                <p className={`text-[11px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{stage.desc}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Sticky Bottom */}
-        <div className={`fixed bottom-0 left-0 right-0 p-6 pb-10 backdrop-blur-2xl border-t flex items-center gap-4 z-[110] ${dark ? 'bg-black/95 border-white/10' : 'bg-white/95 border-black/5'}`}>
-          {isStudent && (
-            <button 
-              onClick={() => {
-                handleStartConversation(selectedMentor.id, selectedMentor.name, selectedMentor.photo);
-              }}
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'}`}
-            >
-              <MessageSquare size={20} />
-            </button>
-          )}
-
-          <button 
-            onClick={() => {
-              if (isTrialCompleted) {
-                setBookingType('package');
-                setBookingStep(1);
-                setShowBookingSheet(true);
-              } else {
-                setBookingType('trial');
-                setBookingStep(1);
-                setShowBookingSheet(true);
-              }
-            }}
-            className={`flex-1 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all active:scale-95 ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
-          >
-            <Music2 size={18} />
-            {isTrialCompleted ? 'Select a Package' : 'Book Free Trial'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   const StudentJourneyView = () => {
     const dark = false;
     
-    if (lessonsLoading) return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 pt-32 bg-[#F9F9F9]">
-        <div className="w-10 h-10 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin" />
-        <p className="text-xs text-zinc-400 font-medium">Loading your journey...</p>
-      </div>
-    );
-
     if (studentLessons.length === 0) return (
       <div className={`flex flex-col items-center justify-center min-h-screen gap-4 text-center px-8 pt-20 ${dark ? 'bg-atmospheric-dark text-white' : 'bg-[#F9F9F9] text-zinc-900'}`}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${dark ? 'bg-white/5' : 'bg-black/5'}`}>
@@ -4059,6 +3652,397 @@ export default function App() {
               <Send size={16} />
             </button>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const StudentDashboard = () => {
+    // Determine theme based on view
+    const getViewTheme = (view: StudentView) => {
+      if (view === 'home') return true; // Dark
+      if (view === 'journey') return false; // Light
+      if (view === 'messages') return true; // Dark
+      if (view === 'profile') return true; // User preference for profile
+      if (view === 'mentor-listing') return true; // Always Dark as requested
+      if (view === 'mentor-profile') return true; // Always Dark as requested
+      return true;
+    };
+
+    const currentViewIsDark = getViewTheme(studentView);
+
+    return (
+      <div className={`h-full flex flex-col transition-colors duration-500 relative overflow-hidden ${currentViewIsDark ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'}`}>
+        {currentViewIsDark && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute bottom-[-20%] right-[-10%] w-[80%] h-[80%] bg-seafoam-glow/20 blur-[150px] rounded-full" />
+            <div className="absolute top-[20%] left-[10%] w-[60%] h-[60%] bg-pine-dark/10 blur-[120px] rounded-full" />
+          </div>
+        )}
+        <div className={`flex-1 overflow-y-auto scrollbar-hide relative z-10 ${!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat ? 'pb-24' : ''}`}>
+          <AnimatePresence mode="wait">
+            {studentView === 'home' && (
+              <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <StudentHomeView forcedDark={true} />
+              </motion.div>
+            )}
+            {studentView === 'mentor-listing' && (
+              <motion.div key="listing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <MentorListingView />
+              </motion.div>
+            )}
+            {studentView === 'mentor-profile' && (
+              <motion.div key="mentor-profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <MentorProfileView />
+              </motion.div>
+            )}
+            {studentView === 'journey' && (
+              <motion.div key="journey" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ minHeight: '100%' }}>
+                <StudentJourneyView forcedDark={false} />
+              </motion.div>
+            )}
+            {studentView === 'messages' && (
+              <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <StudentMessagesView forcedDark={true} />
+              </motion.div>
+            )}
+            {studentView === 'profile' && (
+              <motion.div key="profile-settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <StudentProfileView />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Bottom Nav */}
+        {!['mentor-listing', 'mentor-profile', 'book-trial', 'book-paid', 'schedule-view'].includes(studentView) && !selectedChat && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%]">
+            <div className="backdrop-blur-2xl border rounded-[2rem] px-2 py-1.5 flex items-center justify-between shadow-2xl transition-all duration-500 bg-zinc-900/90 border-white/10">
+              {[
+                { id: 'home', icon: HomeIcon, label: 'Home' },
+                { id: 'journey', icon: Music2, label: 'Journey' },
+                { id: 'messages', icon: MessageSquare, label: 'Chat' },
+                { id: 'profile', icon: User, label: 'Profile' }
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => switchStudentTab(item.id as StudentView)}
+                  className={`relative flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-300 ${
+                    studentView === item.id 
+                      ? 'text-white' 
+                      : 'text-zinc-400 opacity-50 hover:opacity-100'
+                  }`}
+                >
+                  {studentView === item.id && (
+                    <motion.div 
+                      layoutId="activeNavStudent"
+                      className="absolute inset-0 rounded-2xl z-0 bg-white/10"
+                      transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
+                    />
+                  )}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <item.icon size={18} strokeWidth={studentView === item.id ? 2.5 : 2} />
+                    <span className="text-[8px] font-bold uppercase tracking-[0.15em]">{item.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+  const MentorProfileView = () => {
+    const dark = true;
+
+    if (!selectedMentor) return null;
+
+    const mentorInstrument = MOCK_INSTRUMENTS.find(i => 
+      selectedMentor.specialisation.some(s => 
+        s.toLowerCase().includes(i.name.toLowerCase())
+      )
+    );
+    const coverImage = mentorInstrument?.photo || selectedMentor.photo;
+
+    return (
+      <div className={`${dark ? 'bg-atmospheric-dark text-white' : 'bg-white text-zinc-900'} min-h-full`}>
+        <div className="relative h-64 overflow-hidden">
+          {selectedMentor.introVideoUrl ? (
+            <video
+              src={selectedMentor.introVideoUrl}
+              className="w-full h-full object-cover opacity-70"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={coverImage}
+            />
+          ) : (
+            <img 
+              src={coverImage || null}
+              className="w-full h-full object-cover opacity-60" 
+              referrerPolicy="no-referrer" 
+            />
+          )}
+          <div className={`absolute inset-0 bg-gradient-to-t ${dark ? 'from-black' : 'from-white'} via-transparent to-transparent`} />
+          <button 
+            onClick={() => popStudentView()} 
+            className={`absolute top-12 left-5 w-10 h-10 backdrop-blur-xl rounded-full flex items-center justify-center border z-50 transition-all active:scale-90 ${dark ? 'bg-black/20 border-white/10 text-white hover:bg-black/40' : 'bg-white/20 border-black/5 text-zinc-900 hover:bg-white/40'}`}
+          >
+            <ChevronLeft size={20} />
+          </button>
+          {selectedMentor.introVideoUrl && (
+            <button 
+              onClick={() => {
+                const vid = document.querySelector('video') as HTMLVideoElement;
+                if (vid) vid.muted = !vid.muted;
+              }}
+              className="absolute top-12 right-5 w-10 h-10 backdrop-blur-md bg-black/40 border border-white/10 rounded-full flex items-center justify-center text-white z-10"
+            >
+              <Volume2 size={16} />
+            </button>
+          )}
+          <div className="absolute bottom-6 left-5 flex items-end gap-4">
+            <div className="relative">
+              <Avatar name={selectedMentor.name} photo={selectedMentor.photo} size="xl" className={`rounded-[2rem] border-4 shadow-2xl ${dark ? 'border-black' : 'border-white'}`} />
+              {selectedMentor.isVerified && <div className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 ${dark ? 'bg-harbour-400 text-white border-black' : 'bg-harbour-500 text-white border-white'}`}><CheckCircle2 size={12} /></div>}
+            </div>
+            <div className="mb-2">
+              <h1 className={`text-2xl font-serif-sturdy ${dark ? 'text-white' : 'text-zinc-900'}`}>{selectedMentor.name}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-400">
+                  <Star size={12} fill="currentColor" /> {selectedMentor.rating || 4.9}
+                </div>
+                <div className={`flex items-center gap-1 text-xs font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
+                  <MapPin size={12} /> {selectedMentor.location}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 mt-8 space-y-8">
+          <div className={`flex justify-between p-4 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}>
+            {[
+              { label: 'Students', value: selectedMentor.studentsCount || 24, icon: Users },
+              { label: 'Reviews', value: selectedMentor.reviewCount || 47, icon: MessageSquare },
+              { label: 'Experience', value: `${selectedMentor.experienceYears || 8}y`, icon: Award }
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <p className={`text-[8px] font-mono uppercase tracking-widest mb-1 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>{stat.label}</p>
+                <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Profile Completion Shimmer */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-white/40' : 'text-zinc-500'}`}>Profile Completion</span>
+              <span className={`text-[10px] font-bold ${dark ? 'text-harbour-400' : 'text-harbour-600'}`}>{calculateProfileProgress(selectedMentor)}%</span>
+            </div>
+            <div className={`h-1.5 w-full rounded-full overflow-hidden relative ${dark ? 'bg-white/10' : 'bg-black/5'}`}>
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${calculateProfileProgress(selectedMentor)}%` }}
+                className="h-full bg-harbour-500 relative"
+              >
+                <motion.div 
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2"
+                />
+              </motion.div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              setSelectedChat(selectedMentor);
+              pushStudentView('messages');
+            }}
+            className={`w-full py-4 border rounded-2xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/5 text-zinc-900'}`}
+          >
+            <MessageSquare size={16} /> Send Message
+          </button>
+
+          <section>
+            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>About</h2>
+            <p className={`text-sm leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>{selectedMentor.about}</p>
+          </section>
+
+          <section>
+            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Specialisation</h2>
+            <div className="flex flex-wrap gap-2">
+              {selectedMentor.specialisation.map(s => <span key={s} className="px-3 py-1.5 bg-harbour-500/10 text-harbour-400 text-[10px] font-bold rounded-full border border-harbour-500/20">{s}</span>)}
+              {selectedMentor.teachingStyle.map(s => <span key={s} className={`px-3 py-1.5 border text-[10px] font-bold rounded-full ${dark ? 'bg-white/5 text-white/40 border-white/10' : 'bg-black/5 text-zinc-500 border-black/5'}`}>{s}</span>)}
+            </div>
+          </section>
+
+          <section>
+            <h2 className={`text-[10px] uppercase tracking-widest font-bold mb-3 ${dark ? 'text-white/30' : 'text-zinc-500'}`}>Communication</h2>
+            <div className="flex flex-wrap gap-2">
+              {selectedMentor.languages.map(l => <span key={l} className={`px-3 py-1.5 border text-[10px] font-bold rounded-full ${dark ? 'bg-white/5 text-white/60 border-white/10' : 'bg-black/5 text-zinc-600 border-black/5'}`}>{l}</span>)}
+            </div>
+          </section>
+
+          {/* Expandable Sections */}
+          <div id="mentor-packages-section" className="space-y-4">
+            {[
+              { id: 'packages', label: 'Lesson Packages', icon: Music2 },
+              { id: 'path', label: 'Learning Path', icon: BookOpen },
+              { id: 'schedule', label: 'View Schedule', icon: Calendar },
+              { id: 'gallery', label: 'Gallery', icon: ImageIcon },
+              { id: 'reviews', label: 'Student Reviews', icon: Star },
+              { id: 'credentials', label: 'Credentials', icon: Award }
+            ].map((section) => (
+              <div key={section.id} id={`section-${section.id}`} className={`border-b pb-4 ${dark ? 'border-white/10' : 'border-black/5'}`}>
+                <button 
+                  onClick={(e) => {
+                    if (section.id === 'schedule') {
+                      setShowScheduleSheet(true);
+                    } else {
+                      const isExpanding = mentorProfileExpandedSection !== section.id;
+                      setMentorProfileExpandedSection(isExpanding ? section.id : null);
+                      if (isExpanding) {
+                        setTimeout(() => {
+                          document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+                      }
+                    }
+                  }}
+                  className="w-full flex items-center justify-between py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    <section.icon size={18} className={dark ? 'text-white/40' : 'text-zinc-400'} />
+                    <span className={`text-sm font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{section.label}</span>
+                  </div>
+                  <motion.div animate={{ rotate: mentorProfileExpandedSection === section.id ? 180 : 0 }}>
+                    <ChevronRight size={16} className={dark ? 'text-white/20' : 'text-zinc-300'} />
+                  </motion.div>
+                </button>
+                <AnimatePresence>
+                  {mentorProfileExpandedSection === section.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className={`py-4 text-sm ${dark ? 'text-white/60' : 'text-zinc-600'}`}>
+                        {section.id === 'packages' && (
+                          <div className="grid gap-2">
+                            {selectedMentor.packages.map(pkg => (
+                              <button 
+                                key={pkg.id} 
+                                onClick={() => {
+                                  setSelectedPackage(pkg);
+                                  if (pkg.id === 'p1') {
+                                    setBookingType('single');
+                                  } else {
+                                    setBookingType('package');
+                                  }
+                                  setBookingStep(1);
+                                  setShowBookingSheet(true);
+                                }}
+                                className={`p-2.5 border rounded-xl flex justify-between items-center transition-all ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 shadow-sm hover:bg-zinc-50'}`}
+                              >
+                                <div className="text-left">
+                                  <h4 className={`text-[11px] font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{pkg.name}</h4>
+                                  <p className={`text-[8px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>
+                                    {pkg.lessons} Lessons {pkg.validityMonths ? `• ${pkg.validityMonths}m` : ''}
+                                  </p>
+                                </div>
+                                <p className={`text-[11px] font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>
+                                  {pkg.price === 0 ? 'FREE' : `RM ${pkg.price}`}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {section.id === 'reviews' && (
+                          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                            {selectedMentor.reviews.map(review => (
+                              <div key={review.id} className={`min-w-[280px] p-5 border rounded-3xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-100 shadow-sm'}`}>
+                                <div className="flex justify-between mb-3">
+                                  <div>
+                                    <h4 className={`font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{review.studentName}</h4>
+                                    <p className={`text-[10px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{review.lessonsTaken} lessons taken • {review.timeAgo}</p>
+                                  </div>
+                                  <div className="flex text-amber-400">
+                                    {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? 'currentColor' : 'none'} />)}
+                                  </div>
+                                </div>
+                                <p className={`text-xs italic leading-relaxed ${dark ? 'text-white/60' : 'text-zinc-600'}`}>"{review.comment}"</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {section.id === 'credentials' && (
+                          <ul className="space-y-2">
+                            {selectedMentor.credentials.map(c => <li key={c} className="flex items-center gap-2 text-xs"><CheckCircle2 size={12} className="text-harbour-400" /> {c}</li>)}
+                          </ul>
+                        )}
+                        {section.id === 'gallery' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {selectedMentor.gallery.map((img, i) => <img key={i} src={img || null} className="rounded-xl aspect-square object-cover" referrerPolicy="no-referrer" />)}
+                          </div>
+                        )}
+                        {section.id === 'path' && (
+                          <div className="relative pl-6 space-y-6">
+                            <div className={`absolute left-2 top-2 bottom-2 w-0.5 ${dark ? 'bg-white/10' : 'bg-black/5'}`} />
+                            {[
+                              { title: 'Foundations', desc: 'Basic techniques and posture' },
+                              { title: 'Intermediate', desc: 'Complex rhythms and scales' },
+                              { title: 'Advanced', desc: 'Performance pieces and improvisation' }
+                            ].map((stage, i) => (
+                              <div key={i} className="relative">
+                                <div className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-harbour-500 border-2 ${dark ? 'border-black' : 'border-white'}`} />
+                                <h4 className={`font-bold ${dark ? 'text-white' : 'text-zinc-900'}`}>{stage.title}</h4>
+                                <p className={`text-[11px] ${dark ? 'text-white/40' : 'text-zinc-500'}`}>{stage.desc}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sticky Bottom */}
+        <div className={`fixed bottom-0 left-0 right-0 p-6 pb-10 backdrop-blur-2xl border-t flex items-center gap-4 z-[110] ${dark ? 'bg-black/95 border-white/10' : 'bg-white/95 border-black/5'}`}>
+          {isStudent && (
+            <button 
+              onClick={() => {
+                handleStartConversation(selectedMentor.id, selectedMentor.name, selectedMentor.photo);
+              }}
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${dark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-zinc-200 text-zinc-900 shadow-sm hover:bg-zinc-50'}`}
+            >
+              <MessageSquare size={20} />
+            </button>
+          )}
+
+          <button 
+            onClick={() => {
+              if (isTrialCompleted) {
+                setBookingType('package');
+                setBookingStep(1);
+                setShowBookingSheet(true);
+              } else {
+                setBookingType('trial');
+                setBookingStep(1);
+                setShowBookingSheet(true);
+              }
+            }}
+            className={`flex-1 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all active:scale-95 ${dark ? 'bg-white text-black hover:bg-zinc-100' : 'bg-zinc-900 text-white hover:bg-zinc-800'}`}
+          >
+            <Music2 size={18} />
+            {isTrialCompleted ? 'Select a Package' : 'Book Free Trial'}
+          </button>
         </div>
       </div>
     );
@@ -7102,24 +7086,34 @@ Respond ONLY with a JSON object like this, no other text:
 
       try {
         let raw = '';
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
-          },
-          body: JSON.stringify({
+        try {
+          const response = await (window as any).claude.complete({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1000,
             system: systemPrompt,
             messages: [{ role: 'user', content: localBrainDump }],
-          }),
-        });
-        if (!res.ok) throw new Error(`${res.status}`);
-        const data = await res.json();
-        raw = data.content?.[0]?.text || '';
+          });
+          raw = response?.content?.[0]?.text || '';
+        } catch {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+              'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY || '',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 1000,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: localBrainDump }],
+            }),
+          });
+          if (!res.ok) throw new Error(`${res.status}`);
+          const data = await res.json();
+          raw = data.content?.[0]?.text || '';
+        }
 
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
@@ -8103,11 +8097,11 @@ Respond ONLY with a JSON object like this, no other text:
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Hmm, I got an empty response. Please try again.';
+      const reply = data.content?.[0]?.text || 'Hmm, empty response. Try again.';
       setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error('AI Buddy error:', err);
-      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'I had trouble connecting. Please check your internet and try again.' }]);
+      setAiBuddyMessages(prev => [...prev, { role: 'assistant', content: 'I had trouble connecting. Please try again.' }]);
     } finally {
       setIsAiBuddyTyping(false);
     }
